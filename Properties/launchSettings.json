@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ViscaUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "ViscaUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
