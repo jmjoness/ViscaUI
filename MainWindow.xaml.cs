@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Windows.Foundation;
@@ -191,7 +192,7 @@ namespace ViscaUI {
 					Init();
 				}
 
-				string logEntry = $"{DateTime.Now:MM-dd HH:mm:ss} - {message}{Environment.NewLine}";
+				string logEntry = $"{DateTime.Now:MM-dd HH:mm:ss.fff} - {message}{Environment.NewLine}";
 
 				if (FileLocked()) {
 					waitingMsg.Enqueue(logEntry);
@@ -231,6 +232,7 @@ namespace ViscaUI {
 		public MainWindow() {
 			Debug.WriteLine("MainWindow()");
 			InitializeComponent();
+			Title = $"ViscaUI v{Assembly.GetExecutingAssembly().GetName().Version}";
 
 			AppWindow.SetIcon("camera.ico");
 
@@ -401,14 +403,14 @@ namespace ViscaUI {
 
 		private void PowerClick(object sender, RoutedEventArgs e) {
 			if (!powerOn) {
-				byte[] d = { 0, camByte2, normCmd, 0x00, 0x03, 0xFF };
-				sendCommand(d, MsgType.CPower);
+				byte[] d = { 0x00, 0x03 };
+				sendCommand(normCmd, d, MsgType.CPower, "on");
 				powerOn = true;
 				ShowPowerState(powerOn);
 				setControlsState();
 			} else {
-				byte[] d = { 0, camByte2, normCmd, 0x00, 0x02, 0xFF };
-				sendCommand(d, MsgType.CPower);
+				byte[] d = { 0x00, 0x02 };
+				sendCommand(normCmd, d, MsgType.CPower, "off");
 				powerOn = false;
 				ShowPowerState(powerOn);
 
@@ -417,7 +419,7 @@ namespace ViscaUI {
 		}
 
 		#region Send
-		private void sendMessage(VMessage msg) {
+		private void sendMessage(VMessage msg, string more = "") {
 			//responseListAdd("sendMessage() " + msg.type + $", {lastMsg}");
 			if (lastMsg != MsgType.None) {
 				responseListAdd($"QUE: {msg.type.ToString()}");
@@ -429,7 +431,8 @@ namespace ViscaUI {
 						msgStr += b.ToString("X2") + " ";
 					}
 
-					responseListAdd($"SND: {msg.type.ToString().PadRight(20)} - {msgStr}");
+					string info = $"{msg.type} {more}";
+					responseListAdd($"SND: {info.PadRight(20)} - {msgStr}");
 					lastMsg = msg.type;
 					_service.Write(msg.data);
 					lastSend = DateTime.Now;
@@ -457,13 +460,22 @@ namespace ViscaUI {
 			return (byte)(addressBase | deviceId);
 		}
 
-		private  void sendCommand(byte[] data, MsgType type) {
+		private  void sendCommand(byte cmdByte, byte[] data, MsgType type, string more = "") {
 			VMessage msg = new VMessage();
 			msg.type = type;
-			msg.data = data;
-			msg.data[0] = getAddressByte();
-			sendMessage(msg);
+			int dataLen = data.Length;
+			byte[] payload = new byte[dataLen + 4];
+			payload[0] = getAddressByte();
+			payload[1] = camByte2;
+			payload[2] = cmdByte;
+			for (int i = 0; i < dataLen; i++) {
+				payload[i + 3] = data[i];
+			}
+			payload[dataLen + 3] = 0xFF;
+			msg.data = payload;
+			sendMessage(msg, more);
 		}
+
 		private  void sendInquiry(MsgType type) {
 			VMessage msg = new VMessage();
 			msg.type = type;
@@ -815,18 +827,18 @@ namespace ViscaUI {
 
 		#region Pan Tilt
 		private  void panTiltStop() {
-			byte[] d = { 0, camByte2, panTiltCmd, 0x01, panRate, tiltRate, 0x03, 0x03, 0xFF };
-			sendCommand(d, MsgType.CPanTilt);
+			byte[] d = { 0x01, panRate, tiltRate, 0x03, 0x03 };
+			sendCommand(panTiltCmd, d, MsgType.CPanTilt, "stop");
 		}
 
 		private  void panTiltStart(byte b6, byte b7) {
-			byte[] d = { 0, camByte2, panTiltCmd, 0x01, panRate, tiltRate, b6, b7, 0xFF };
-			sendCommand(d, MsgType.CPanTilt);
+			byte[] d = {  0x01, panRate, tiltRate, b6, b7 };
+			sendCommand(panTiltCmd, d, MsgType.CPanTilt, $"p {panRate}, t {tiltRate}");
 		}
 
 		private  void CenterBtnClick(object sender, RoutedEventArgs e) {
-			byte[] d = { 0, camByte2, panTiltCmd, 0x04, 0xFF };
-			sendCommand(d, MsgType.CPanTilt);
+			byte[] d = { 0x04 };
+			sendCommand(panTiltCmd, d, MsgType.CPanTilt, "center");
 		}
 
 		private void ptRect_MouseDown(object sender, PointerRoutedEventArgs e) {
@@ -898,20 +910,20 @@ namespace ViscaUI {
 		#region Zooom
 		private void zoomStop() {
 			responseListAdd("zoom stop");
-			byte[] d = { 0, camByte2, normCmd, 0x07, 0x00, 0xFF };
-			sendCommand(d, MsgType.CZoom);
+			byte[] d = { 0x07, 0x00 };
+			sendCommand(normCmd, d, MsgType.CZoom, "stop");
 		}
 
 		private void zoomIn() {
 			byte cmd = (byte)(0x20 | zoomRate);
-			byte[] d = { 0, camByte2, normCmd, 0x07, cmd, 0xFF };
-			sendCommand(d, MsgType.CZoom);
+			byte[] d = { 0x07, cmd };
+			sendCommand(normCmd, d, MsgType.CZoom, $"in {zoomRate}");
 		}
 
 		private void zoomOut() {
 			byte cmd = (byte)(0x30 | zoomRate);
-			byte[] d = { 0, camByte2, normCmd, 0x07, cmd, 0xFF };
-			sendCommand(d, MsgType.CZoom);
+			byte[] d = { 0x07, cmd };
+			sendCommand(normCmd, d, MsgType.CZoom, $"out {zoomRate}");
 		}
 
 		private void zmRect_MouseDown(object sender, PointerRoutedEventArgs e) {
@@ -981,27 +993,26 @@ namespace ViscaUI {
 		private void setFocusType(bool manual) {
 			focusRect.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
 			if (lastMsg == MsgType.None) {
-				byte[] d = { 0, camByte2, normCmd, 0x38, (byte)(manual ? 0x03 : 0x02), 0xFF };
-				sendCommand(d, MsgType.CFocusMode);
+				byte[] d = { 0x38, (byte)(manual ? 0x03 : 0x02) };
+				sendCommand(normCmd, d, MsgType.CFocusMode, $"{(manual ? "manual" : "auto")}");
 			}
 		}
 
 		private void focusStop() {
-			responseListAdd("focus stop");
-			byte[] d = { 0, camByte2, normCmd, 0x08, 0x00, 0xFF };
-			sendCommand(d, MsgType.CFocus);
+			byte[] d = { 0x08, 0x00 };
+			sendCommand(normCmd, d, MsgType.CFocus, "stop");
 		}
 
 		private void focusIn() {
 			byte cmd = (byte)(0x30 | focusRate);
-			byte[] d = { 0, camByte2, normCmd, 0x08, cmd, 0xFF };
-			sendCommand(d, MsgType.CFocus);
+			byte[] d = { 0x08, cmd };
+			sendCommand(normCmd, d, MsgType.CFocus, $"in {focusRate}");
 		}
 
 		private void focusOut() {
 			byte cmd = (byte)(0x20 | focusRate);
-			byte[] d = { 0, camByte2, normCmd, 0x08, cmd, 0xFF };
-			sendCommand(d, MsgType.CFocus);
+			byte[] d = { 0x08, cmd };
+			sendCommand(normCmd, d, MsgType.CFocus, $"out {focusRate}");
 		}
 		private void FocusManualClick(object sender, RoutedEventArgs e) {
 			setFocusType(focusManual.IsChecked == true);
@@ -1107,7 +1118,9 @@ namespace ViscaUI {
 			settingPreset = true;
 			this.DispatcherQueue.TryEnqueue(() => {
 				if (lastPreset is not null) {
-					lastPreset.Background = new SolidColorBrush(Colors.Red);
+					this.DispatcherQueue.TryEnqueue(() => {
+						presetPanels[lastPresetNumber].Background = new SolidColorBrush(Colors.Red);
+					});
 				}
 			});
 			if (presetTimer is not null) {
@@ -1125,9 +1138,9 @@ namespace ViscaUI {
 				presetPanels[number].Background = new SolidColorBrush(Colors.Maroon);
 			});
 
-			byte[] d = { 0, camByte2, 0x04, 0x3F, 0x01, number, 0xFF };
-			d[4] = settingPreset ? (byte)0x01 : (byte)0x02;
-			sendCommand(d, MsgType.CMemory);
+			byte[] d = { 0x3F, 0x01, number };
+			d[1] = settingPreset ? (byte)0x01 : (byte)0x02;
+			sendCommand(normCmd, d, MsgType.CMemory, $"preset {number + 1}");
 
 			if (presetTimer1 is not null) {
 				presetTimer1.Enabled = false;
@@ -1193,8 +1206,8 @@ namespace ViscaUI {
 				ShowExposure(0);
 			}
 
-			byte[] d = { 0, camByte2, normCmd, 0x39, (byte)(manual ? 0x0D : 0x00), 0xFF };
-			sendCommand(d, MsgType.CBright);
+			byte[] d = { 0x39, (byte)(manual ? 0x0D : 0x00) };
+			sendCommand(normCmd, d, MsgType.CBright, $"mode {(manual ? "manual" : "auto")}");
 
 			if (!manual) {
 				sendInquiry(MsgType.IBacklightMode);
@@ -1209,8 +1222,8 @@ namespace ViscaUI {
 				int value = (int)e.NewValue;
 				byte p = (byte)((value >> 4) & 1);
 				byte q = (byte)(value & 0x0F);
-				byte[] d = { 0, camByte2, normCmd, 0x4D, 0x00, 0x00, p, q, 0xFF };
-				sendCommand(d, MsgType.CBright);
+				byte[] d = { 0x4D, 0x00, 0x00, p, q };
+				sendCommand(normCmd, d, MsgType.CBright, $"exposure {value}");
 				ShowExposure(value);
 			}
 		}
@@ -1224,8 +1237,8 @@ namespace ViscaUI {
 
 		private void setBacklight(bool on) {
 			if (lastMsg == MsgType.None) {
-				byte[] d = { 0, camByte2, normCmd, 0x33, (byte)(on ? 0x02 : 0x03), 0xFF };
-				sendCommand(d, MsgType.CBacklight);
+				byte[] d = { 0x33, (byte)(on ? 0x02 : 0x03), 0xFF };
+				sendCommand(normCmd, d, MsgType.CBacklight, $"{(on ? "on" : "off")}");
 			}
 		}
 
@@ -1239,8 +1252,8 @@ namespace ViscaUI {
 		private void setExpComp(bool on) {
 			displayExpComp(on);
 
-			byte[] d = { 0, camByte2, normCmd, 0x3E, (byte)(on ? 0x02 : 0x03), 0xFF };
-			sendCommand(d, MsgType.CExpCompOn);
+			byte[] d = { 0x3E, (byte)(on ? 0x02 : 0x03) };
+			sendCommand(normCmd, d, MsgType.CExpCompOn, $"{(on ? "on" : "off")}");
 
 			if (on) {
 				sendInquiry(MsgType.IExpCompPos);
@@ -1265,8 +1278,8 @@ namespace ViscaUI {
 			int value = (int)e.NewValue;
 			byte p = 0;
 			byte q = (byte)(value & 0x0f);
-			byte[] d = { 0, camByte2, normCmd, 0x4E, 0x00, 0x00, p, q, 0xFF };
-			sendCommand(d, MsgType.CExpCompPos);
+			byte[] d = { 0x4E, 0x00, 0x00, p, q };
+			sendCommand(normCmd, d, MsgType.CExpCompPos, $"{value}");
 			ShowExposureComp(value);
 		}
 		#endregion
@@ -1302,8 +1315,8 @@ namespace ViscaUI {
 				wbRedSlider.IsEnabled = manual;
 				wbBlueSlider.IsEnabled = manual;
 
-				byte[] d = { 0, camByte2, normCmd, 0x35, BalanceCmd[(int)balance], 0xFF };
-				sendCommand(d, MsgType.CBalanceMode);
+				byte[] d = { 0x35, BalanceCmd[(int)balance] };
+				sendCommand(normCmd, d, MsgType.CBalanceMode, BalanceStrs[(int)balance]);
 
 				if (balanceType == BalanceType.Manual) {
 					sendInquiry(MsgType.IBalanceRed);
@@ -1313,8 +1326,8 @@ namespace ViscaUI {
 		}
 
 		private void BalTriggerBtnClick(object sender, RoutedEventArgs e) {
-			byte[] d = { 0, camByte2, normCmd, 0x10, 0x05, 0xFF };
-			sendCommand(d, MsgType.CBalanceTrigger);
+			byte[] d = { 0x10, 0x05 };
+			sendCommand(normCmd, d, MsgType.CBalanceTrigger);
 		}
 
 		private void ShowGainText(TextBox text, int value) {
@@ -1331,8 +1344,8 @@ namespace ViscaUI {
 
 				byte p = (byte)(value >> 4);
 				byte q = (byte)(value & 0x0f);
-				byte[] d = { 0, camByte2, normCmd, 0x43, 0x00, 0x00, p, q, 0xFF };
-				sendCommand(d, MsgType.CBalanceRed);
+				byte[] d = { 0x43, 0x00, 0x00, p, q };
+				sendCommand(normCmd, d, MsgType.CBalanceRed, $"{value}");
 				ShowGainText(wbRedText, value);
 			}
 		}
@@ -1342,8 +1355,8 @@ namespace ViscaUI {
 				int value = (int)e.NewValue;
 				byte p = (byte)(value >> 4);
 				byte q = (byte)(value & 0x0f);
-				byte[] d = { 0, camByte2, normCmd, 0x44, 0x00, 0x00, p, q, 0xFF };
-				sendCommand(d, MsgType.CBalanceBlue);
+				byte[] d = { 0x44, 0x00, 0x00, p, q };
+				sendCommand(normCmd, d, MsgType.CBalanceBlue, $"{value}");
 				ShowGainText(wbBlueText, value);
 			}
 		}
