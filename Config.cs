@@ -15,15 +15,15 @@ namespace ViscaUI {
 		const string InitStr = "Init";
 		const string LogStr = "Log";
 		const string InstanceStr = "Instance";
-		static string[] CameraStrs = { "Camera0", "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6" };
-		static string[] PresetStrs = { "Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5" };
-		static string CalibratedStr = "Calibrated";
-		static string CalibrationXMinStr = "CalibrationXMin";
-		static string CalibrationXMaxStr = "CalibrationXMax";
-		static string CalibrationYMinStr = "CalibrationYMin";
-		static string CalibrationYMaxStr = "CalibrationYMax";
-		static string CalibrationZMinStr = "CalibrationZMin";
-		static string CalibrationZMaxStr = "CalibrationZMax";
+		readonly static string[] CameraStrs = [ "Camera0", "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6" ];
+		readonly static string[] PresetStrs = [ "Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5" ];
+		const string CalibratedStr = "Calibrated";
+		const string CalibrationXMinStr = "CalibrationXMin";
+		const string CalibrationXMaxStr = "CalibrationXMax";
+		const string CalibrationYMinStr = "CalibrationYMin";
+		const string CalibrationYMaxStr = "CalibrationYMax";
+		const string CalibrationZMinStr = "CalibrationZMin";
+		const string CalibrationZMaxStr = "CalibrationZMax";
 
 		static int m_number = 0;
 
@@ -83,10 +83,7 @@ namespace ViscaUI {
 		static public Point Location
 		{
 			get {
-				Point p = new();
-				p.X = GetInt(LocXStr, 0);
-				p.Y = GetInt(LocYStr, 0);
-				return p;
+				return new Point(GetInt(LocXStr, 0), GetInt(LocYStr, 0));
 			}
 			set {
 				SetInt(LocXStr, value.X);
