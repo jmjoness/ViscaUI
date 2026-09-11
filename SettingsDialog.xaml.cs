@@ -58,11 +58,11 @@ public sealed partial class SettingsDialog : ContentDialog
 		int ns = speedCombo.Items.IndexOf(speed);
 		speedCombo.SelectedIndex = ns;
 
-		modeCombo.Items.Add("D70");
-		modeCombo.Items.Add("D30");
-		Mode m = Config.Mode;
-		int nm = modeCombo.Items.IndexOf(m.ToString());
-		modeCombo.SelectedIndex = nm;
+		//modeCombo.Items.Add("D70");
+		//modeCombo.Items.Add("D30");
+		//Mode m = Config.Mode;
+		//int nm = modeCombo.Items.IndexOf(m.ToString());
+		//modeCombo.SelectedIndex = nm;
 
 		miniCheck.IsChecked = Config.Mini;
 		commsCheck.IsChecked = Config.Debug;
@@ -86,11 +86,11 @@ public sealed partial class SettingsDialog : ContentDialog
 		}
 	}
 
-	private void modeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) {
-		if (modeCombo.SelectedItem is string s && (ModeStrs[(int)Config.Mode] != s)) {
-			Config.Mode = (s == "EVI-D30") ? Mode.D30 : Mode.D70;
-		}
-	}
+	//private void modeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) {
+	//	if (modeCombo.SelectedItem is string s && (ModeStrs[(int)Config.Mode] != s)) {
+	//		Config.Mode = (s == "EVI-D30") ? Mode.D30 : Mode.D70;
+	//	}
+	//}
 
 	private void miniCheck_Checked(object sender, RoutedEventArgs e) {
 		Config.Mini = true;

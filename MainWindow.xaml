@@ -39,6 +39,7 @@
 				<Button HorizontalAlignment="Left" Margin="0,0,0,0" VerticalAlignment="Top" Height="48" Click="PowerClick" Background="Transparent" BorderThickness="0,0,0,0">
 					<Image x:Name="powerImg" Source="ms-appx:///Assets/power-off.svg" Width="32" Height="32" MinHeight="32" MinWidth="32" />
 				</Button>
+				<TextBlock x:Name="vendorModel" Text="Vendor/Model" Foreground="Azure" TextAlignment="Center" Height="18" />
 			</StackPanel>
 
 			<Grid Grid.Row="1">
@@ -313,7 +314,6 @@
 						<StackPanel Grid.Column="0" Orientation="Vertical" Margin="10,10,0,0">
 							<ComboBox x:Name="wbSelectCombo" SelectionChanged="BalSelectChanged" Background="Azure" Foreground="Black" >
 							</ComboBox>
-							<Button x:Name="wbTriggerBtn" Content="Trigger" Click="BalTriggerBtnClick" Background="Azure" Foreground="Black" />
 						</StackPanel>
 						<StackPanel Grid.Column="1" Orientation="Vertical" Margin="0">
 							<Slider x:Name="wbRedSlider" Minimum="0" Maximum="255" Orientation="Vertical" Height="80" Margin="10,5,0,0" ValueChanged="BalRedSliderChanged" >

@@ -37,6 +37,23 @@ namespace ViscaUI
 		}
 	}
 
+	struct DeviceInfo {
+		public byte address;
+		public string name;
+		public string vendor;
+		public string model;
+		public string version;
+		public uint restrict;
+		public DeviceInfo(byte address, string name, string vendor, string model, string version, uint restrict = 0) {
+			this.address = address;
+			this.name = name;
+			this.vendor = vendor;
+			this.model = model;
+			this.version = version;
+			this.restrict = restrict;
+		}
+	}
+
 	class MsgQueue
 	{
 		List<VMessage> list = new();

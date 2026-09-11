@@ -1,3 +1,4 @@
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -6,6 +7,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging; // WinUI 3
+using Microsoft.WindowsAppSDK.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -26,49 +28,106 @@ namespace ViscaUI {
 	/// </summary>
 	public sealed partial class MainWindow : Window {
 		#region Enums and Constants
-		enum BalanceType { Auto, Indoor, Outdoor, OnePush, AutoTracing, Manual }
+		enum BalanceType { Auto, Indoor, Outdoor, OnePush, AutoTrace, Manual }
 		static BalanceType balanceType = BalanceType.Auto;
-		static string[] BalanceStrs = { "Auto", "Indoor", "Outdoor", "One Push", "Auto Tracing", "Manual" };
 
-		static byte[] MessageByte = { 0x00, 0x00, 0x07, 0x08, 0x38, 0x39, 0x0D, 0x33, 0x3F, 0x01, 0x00,
-										0x35, 0x10, 0x43, 0x44, 0x3E, 0x33, 0x08,
-										0x00, 0x47, 0x38, 0x48, 0x39, 0x4D, 0x33, 0x3F,
-										0x35, 0x43, 0x44, 0x3E, 0x4E, 0x4A, 0x4B, 0x4C };
-		byte[] BalanceCmd = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 };
-		string[] BalanceStrings = { "Auto", "Indoor", "Outdoor", "One Push", "Auto Tracing", "Manual" };
-		string[] IrisStrings = { " --", "F22", "F19", "F16", "F14", "F11", "F9.6", "F8.0", "F6.8", "F5.6", "F4.8",
-										 "F4.0", "F3.4", "F2.8", "F2.4", "F2.0", "F1.6", "F1.4", "F1.4", "F1.4", "F1.4",
-										 "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4",
-										 "F1.4", "F1.4" };
-		string[] GainStrings = { "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB",
-										 "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "2 dB", "4 dB",
-										 "6 dB", "8 dB", "10 dB", "12 dB", "14 dB", "16 dB", "18 dB", "20 dB", "22 dB", "24 dB",
-										 "26 dB", "28 dB" };
-		string[] IrisD30Strings = { " --", "F28", "F22", "F19", "F16", "F14", "F11", "F9.6", "F8.0", "F6.8", "F5.6", "F4.8",
-										 "F4.0", "F3.4", "F2.8", "F2.4", "F2.0", "F1.8" };
-		string[] GainD30Strings = { "-3 dB", "0 dB", "3 dB", "6 dB", "9 dB", "12 dB", "15 dB", "18 dB", "21 dB", "24 dB", "27 dB",
-											 "30 dB", "33 dB", "36 dB", "39 dB", "42 dB", "45 dB" };
-		string[] ExpCompStrings = { "-10.5 dB", "-9 dB", "-7.5 dB", "-6 dB", "-4.5 dB", "-3 dB", "-1.5 dB", "0 dB",
-											 "1.5 dB", "3 dB", "4.5 dB", "6 dB", "7.5 dB", "9 dB", "10.5 dB" };
-		string[] ShutterStrings = { "1/1", "1/2", "1/4", "1/8", "1/15", "1/30", "1/60", "1/90", "1/100", "1/125",
-											 "1/180", "1/250", "1/350", "1/500", "1/725", "1/1000", "1/1500", "1/2000", "1/3000", "1/4000",
-											 "1/6000", "1/10000" };
+		readonly static Dictionary<BalanceType, string> balanceStrMap = new Dictionary<BalanceType, string> {
+			{ BalanceType.Auto, "Auto" },
+			{ BalanceType.Indoor, "Indoor" },
+			{ BalanceType.Outdoor, "Outdoor" },
+			{ BalanceType.OnePush, "One Push" },
+			{ BalanceType.AutoTrace, "Auto Trace" },
+			{ BalanceType.Manual, "Manual" }
+		};
+
+		readonly static Dictionary<BalanceType, byte> balanceCmdMap = new Dictionary<BalanceType, byte> {
+			{ BalanceType.Auto, 0x00 },
+			{ BalanceType.Indoor, 0x01 },
+			{ BalanceType.Outdoor, 0x02 },
+			{ BalanceType.OnePush, 0x03 },
+			{ BalanceType.AutoTrace, 0x04 },
+			{ BalanceType.Manual, 0x05 }
+		};
+
+		readonly static byte[] CommandByte = [ 0x00, 0x00, 0x00,
+										0x00, 0x00, 0x01, 0x03, 0x04, 
+										0x07, 0x3F, 
+										0x08, 0x38, 0x39, 0x4D, 0x33, 
+										0x3E, 0x4E, 0x35, 0x43, 0x44, 
+										0x00, 0x57, 0x39, 0x4d, 0x33, 
+										0x3F, 0x35, 0x43, 0x44, 0x3E, 
+										0x4E, 0x02 ];
+
+		readonly Dictionary<int, string> vendorMap = new Dictionary<int, string> {
+			{ 0x01, "Sony" },
+			{ 0x03, "Everet" },
+			{ 0x10, "Sony" },
+			{ 0x20, "Canon" },
+			{ 0x30, "Panasonic" },
+			{ 0x220, "Datavideo" },
+			{ 0x800, "Lumens" },
+			{ 0x0F0F, "GNT" },
+			{ 0x2574, "AVer" }
+		};
+
+		readonly Dictionary<int, string> sonyModelMap = new Dictionary<int, string> {
+			{ 0x400, "EVI-D30" },
+			{ 0x401, "EVI-D100" },
+			{ 0x403, "EVI-D70" },
+			{ 0x404, "EVI-D70" },
+			{ 0x40D, "EVI-D100" },
+			{ 0x40E, "EVI-D70" },
+			{ 0x504, "EVI-HD1" },
+			{ 0x505, "EVI-HD3" },
+			{ 0x507, "EVI-HD7" },
+			{ 0x514, "EVI-H100" }
+		};
+		readonly Dictionary<int, string> averModelMap = new Dictionary<int, string> {
+			{ 0x559, "MD330" },
+			{ 0x565, "MD120" },
+			{ 0x500, "PTZ210" },
+			{ 0x510, "PTC500" }
+		};
+
+		uint NoWBManual = 0x01;
+		uint NoBrightDirect = 0x02;
+
+		//readonly string[] IrisStrings = { " --", "F22", "F19", "F16", "F14", "F11", "F9.6", "F8.0", "F6.8", "F5.6", "F4.8",
+		//								 "F4.0", "F3.4", "F2.8", "F2.4", "F2.0", "F1.6", "F1.4", "F1.4", "F1.4", "F1.4",
+		//								 "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4", "F1.4",
+		//								 "F1.4", "F1.4" };
+		//string[] GainStrings = { "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB",
+		//								 "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "0 dB", "2 dB", "4 dB",
+		//								 "6 dB", "8 dB", "10 dB", "12 dB", "14 dB", "16 dB", "18 dB", "20 dB", "22 dB", "24 dB",
+		//								 "26 dB", "28 dB" };
+		//string[] IrisD30Strings = { " --", "F28", "F22", "F19", "F16", "F14", "F11", "F9.6", "F8.0", "F6.8", "F5.6", "F4.8",
+		//								 "F4.0", "F3.4", "F2.8", "F2.4", "F2.0", "F1.8" };
+		//string[] GainD30Strings = { "-3 dB", "0 dB", "3 dB", "6 dB", "9 dB", "12 dB", "15 dB", "18 dB", "21 dB", "24 dB", "27 dB",
+		//									 "30 dB", "33 dB", "36 dB", "39 dB", "42 dB", "45 dB" };
+		//string[] ExpCompStrings = { "-10.5 dB", "-9 dB", "-7.5 dB", "-6 dB", "-4.5 dB", "-3 dB", "-1.5 dB", "0 dB",
+		//									 "1.5 dB", "3 dB", "4.5 dB", "6 dB", "7.5 dB", "9 dB", "10.5 dB" };
+		//string[] ShutterStrings = { "1/1", "1/2", "1/4", "1/8", "1/15", "1/30", "1/60", "1/90", "1/100", "1/125",
+		//									 "1/180", "1/250", "1/350", "1/500", "1/725", "1/1000", "1/1500", "1/2000", "1/3000", "1/4000",
+		//									 "1/6000", "1/10000" };
 		#endregion
 		#region Class Variables
 		private readonly SerialPortService _service = new();
 
 
-		static MsgQueue msgQueue = new MsgQueue();
-		static MsgType lastMsg = MsgType.None;
+		readonly	static MsgQueue msgQueue = new();
+		static CommandType lastCmdType = CommandType.None;
 		static DateTime lastSend = DateTime.Now;
+		static int lastMsgNum = 0;
 
 		public bool keepReading = false;
-		static Queue<byte> receiveQueue = new Queue<byte>();
+		readonly static Queue<byte> receiveQueue = new Queue<byte>();
 
 		static int numDevices = 0;
-		static int deviceId = 1;
+		static uint deviceId = 1;
 		static bool powerOn = false;
 		static Mode currentMode = Mode.D70;
+		static bool noWBManual = false;
+		static List<DeviceInfo> deviceInfos = new List<DeviceInfo>();
 
 		static byte panRate = 1;
 		static byte tiltRate = 1;
@@ -82,7 +141,8 @@ namespace ViscaUI {
 		static int lastZoomRate = 0;
 		static int lastFocusRate = 0;
 
-		static bool log = false;
+		static bool loggingOn = false;
+		static bool debugOn = false;
 		static bool loaded = false;
 
 		Microsoft.UI.Windowing.AppWindow? appWindow = null;
@@ -91,14 +151,14 @@ namespace ViscaUI {
 
 		#region UI Elements
 
-		List <Button> presetButtons = new List<Button>();
-		List<TextBox> presetTexts = new List<TextBox>();
-		List<Panel> presetPanels = new List<Panel>();
-		List<RadioButton> deviceButtons = new List<RadioButton>();
-		List<TextBox> cameraTexts = new List<TextBox>();
-		List<Button> ptzButtons = new List<Button>();
-		List<Control> focusControls = new List<Control>();
-		List<Control> exposureControls = new List<Control>();
+		List<Button> presetButtons = new();
+		List<TextBox> presetTexts = new();
+		List<Panel> presetPanels = new();
+		List<RadioButton> deviceButtons = new();
+		List<TextBox> cameraTexts = new();
+		List<Button> ptzButtons = new();		 
+		List<Control> focusControls = new();
+		List<Control> exposureControls = new();
 
 		#endregion
 
@@ -149,29 +209,42 @@ namespace ViscaUI {
 		//int SelectPresetBtn = 3;
 		//int TriggerBtn = 7;
 
+		#region Simple Logger
 		public static class SimpleLogger {
-			static string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-			static string logDirectory = Path.Combine(appDataPath, "ViscaUI");
-			private static string LogFilePath = Path.Combine(logDirectory, "Visca-01.log");
+			static string appDataPath = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
+			private static string LogFilePath = Path.Combine(appDataPath, "Visca-01.log");
 			private static bool initialized = false;
 			private static bool logExists = false;
 			private static Queue<string> waitingMsg = new Queue<string>();
 
 			private static async void Init() {
 				try {
-					Debug.WriteLine($"Init(), {logDirectory}");
-					Directory.CreateDirectory(logDirectory);
-					Debug.WriteLine("after log directory create");
+					string logFolderPath = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
+					string[] logFiles = Directory.GetFiles(appDataPath, "Visca-*.log");
+
+					int logNo = 1;
+
+					foreach (var file in logFiles) {
+						string fileName = Path.GetFileName(file);
+						int n = 0;
+						string nStr = fileName.Replace("Visca-", "").Replace(".log", "");
+						if (Int32.TryParse(nStr, out n)) {
+							logNo = int.Max(logNo, n);
+						}
+					}
+
+					logNo++;
+					if (logNo > 10) {
+						logNo = 1;
+					}
+
 					initialized = true;
 
-					int lastLog = Config.Instance;
-					int nextLog = lastLog + 1;
-					if (nextLog > 10) {
-						nextLog = 1;
-					}
-					Config.Instance = nextLog;
+					int nextLog = logNo;
+					//Config.Instance = nextLog;
 					string fName = $"Visca-{nextLog:D2}.log";
-					string fPath = Path.Combine(logDirectory, fName);
+					string fPath = Path.Combine(appDataPath, fName);
+					Debug.WriteLine($"log path: {fPath}");
 					if (File.Exists(fPath)) {
 						File.Delete(fPath);
 					}
@@ -182,6 +255,8 @@ namespace ViscaUI {
 						LogFilePath = fPath;
 						logExists = true;
 					}
+				} catch (System.IO.IOException exc) {
+					Debug.WriteLine($"Init() system IO exception: {exc}");
 				} catch (Exception exc) {
 					Debug.WriteLine($"Init() exception: {exc}");
 				}
@@ -220,12 +295,17 @@ namespace ViscaUI {
 				return false;
 			}
 		}
+		#endregion
 
-		public static void dfo(string txt) {
-			if (log) {
+		public void dfo(string txt) {
+			if (loggingOn) {
 #pragma warning disable CS4014
 				SimpleLogger.LogAsync(txt);
 #pragma warning restore CS4014
+			}
+
+			if (debugOn) {
+				responseListAdd(txt);
 			}
 		}
 
@@ -277,9 +357,8 @@ namespace ViscaUI {
 
 			appWindow.Resize(new Windows.Graphics.SizeInt32(510, Config.Debug ? 850 : 510));
 
-			C1.IsChecked = true;
-
-			log = Config.Log;
+			loggingOn = Config.Log;
+			debugOn = Config.Debug;
 
 			dfo("start");
 
@@ -317,9 +396,12 @@ namespace ViscaUI {
 				b.AddHandler( UIElement.PointerReleasedEvent, new PointerEventHandler(PresetUp), handledEventsToo: true );
 			}
 
-			for (int i = 0; i < presetTexts.Count; i++) {
-				presetTexts[i].Text = Config.GetPreset((uint)i);
+			string[] presets = Config.GetPresets(deviceId - 1);
+			for (int i = 0; i < presets.Length; i++) {
+				presetTexts[i].Text = presets[i];
 			}
+
+			C1.IsChecked = true;
 
 			dfo("init");
 		}
@@ -329,10 +411,10 @@ namespace ViscaUI {
 				bool enable = false;
 				if ((_service != null) && _service.IsConnected) {
 					enable = true;
-					ShowPowerState(true);
+					//ShowPowerState(true);
 				} else {
 					enable = false;
-					ShowPowerState(false);
+					//ShowPowerState(false);
 				}
 
 				foreach (Button b in ptzButtons) {
@@ -349,12 +431,14 @@ namespace ViscaUI {
 
 				displayBrightMode(false);
 				displayExpComp(false);
-				balanceSetup(currentMode);
+				balanceSetup();
 			});
 		}
 
 		private void ShowPowerState(bool on) {
+			powerOn = on;
 			this.DispatcherQueue.TryEnqueue(() => {
+
 				string state = on ? "on" : "off";
 				powerImg.Source = new SvgImageSource(new Uri($"ms-appx:///Assets/power-{state}.svg"));
 			});
@@ -402,53 +486,45 @@ namespace ViscaUI {
 		}
 
 		private void PowerClick(object sender, RoutedEventArgs e) {
-			if (!powerOn) {
-				byte[] d = { 0x00, 0x03 };
-				sendCommand(normCmd, d, MsgType.CPower, "on");
-				powerOn = true;
-				ShowPowerState(powerOn);
-				setControlsState();
+			if (powerOn) {
+				byte[] d = { 0x03 };
+				sendCommand(CommandType.CMD_Power, d, "off");
+				ShowPowerState(false);
 			} else {
-				byte[] d = { 0x00, 0x02 };
-				sendCommand(normCmd, d, MsgType.CPower, "off");
-				powerOn = false;
-				ShowPowerState(powerOn);
-
-				sendInquiry(MsgType.IPower);
+				byte[] d = { 0x02 };
+				sendCommand(CommandType.CMD_Power, d, "on");
+				ShowPowerState(true);
+				setControlsState();
 			}
 		}
 
 		#region Send
-		private void sendMessage(VMessage msg, string more = "") {
-			//responseListAdd("sendMessage() " + msg.type + $", {lastMsg}");
-			if (lastMsg != MsgType.None) {
-				responseListAdd($"QUE: {msg.type.ToString()}");
-				msgQueue.Enqueue(msg);
-			} else if (_service.IsConnected) {
-				try {
-					string msgStr = "";
-					foreach (byte b in msg.data) {
-						msgStr += b.ToString("X2") + " ";
-					}
+		private string dataToHex(byte[] data) {
+			string msgStr = "";
+			foreach (byte b in data) {
+				msgStr += b.ToString("X2") + " ";
+			}
 
-					string info = $"{msg.type} {more}";
-					responseListAdd($"SND: {info.PadRight(20)} - {msgStr}");
-					lastMsg = msg.type;
-					_service.Write(msg.data);
-					lastSend = DateTime.Now;
-					receiveTimer = new System.Timers.Timer(3000);
-					receiveTimer.Elapsed += ReceiveTimer_Tick;
-					receiveTimer.Enabled = true;
+			return msgStr;
+		}
 
-				} catch (Exception e) {
-					responseListAdd("send message exception: " + e.Message);
+		private void SendMsg(VMessage msg) {
+			if (_service.IsConnected) {
+				lastMsgNum++;
+				msg.msgNum = lastMsgNum;
+
+				if (lastCmdType == CommandType.None) {
+					ProcessSendMsg(msg);
+				} else {
+					dfo($"QUE: {msg.cmdType.ToString().PadRight(25)} - {dataToHex(msg.data)}");
+					msgQueue.Enqueue(msg);
 				}
 			} else if (!connectionFailed) {
 				connectionFailed = true;
-				responseListAdd("port is not connected");
+				dfo("port is not connected");
 				_service.Disconnect();
 				msgQueue.Clear();
-				lastMsg = MsgType.None;
+				lastCmdType = CommandType.None;
 				ShowConnectedState(false);
 				setControlsState();
 
@@ -456,44 +532,64 @@ namespace ViscaUI {
 			}
 		}
 
+		private void ProcessSendMsg(VMessage msg) {
+			lastCmdType = msg.cmdType;
+			List<byte> msgData = new();
+
+			switch (msg.msgType) {
+				case MessageType.MSG_Broadcast:
+					msgData.Add(0x88);
+					break;
+				case MessageType.MSG_Command:
+					msgData.Add(getAddressByte());
+					msgData.Add(0x01);
+					msgData.Add((msg.cmdType == CommandType.CMD_PanTilt) ? panTiltCmd : normCmd);
+					msgData.Add((byte)CommandByte[(int)msg.cmdType]);
+					break;
+				case MessageType.MSG_Inquiry:
+					msgData.Add(getAddressByte());
+					msgData.Add(0x09);
+					msgData.Add((msg.cmdType == CommandType.INQ_DeviceType) ? (byte)0x00 : (byte)0x04);
+					msgData.Add((byte)CommandByte[(int)msg.cmdType]);
+					break;
+				default:
+					dfo("Unknown message type: " + msg.msgType.ToString());
+					return;
+			}
+
+			msgData.AddRange(msg.data);
+			msgData.Add(0xFF);
+			byte[] ary = msgData.ToArray();
+			_service.Write(ary);
+
+			string info = msg.cmdType.ToString() + (msg.comment.Length > 0 ? (", " + msg.comment) : "");
+			dfo($"SND: {info.PadRight(25)} - {dataToHex(ary)}");
+			lastSend = DateTime.Now;
+			receiveTimer = new System.Timers.Timer(3000);
+			receiveTimer.Elapsed += ReceiveTimer_Tick;
+			receiveTimer.Enabled = true;
+		}
+
 		private  byte getAddressByte() {
 			return (byte)(addressBase | deviceId);
 		}
-
-		private  void sendCommand(byte cmdByte, byte[] data, MsgType type, string more = "") {
-			VMessage msg = new VMessage();
-			msg.type = type;
-			int dataLen = data.Length;
-			byte[] payload = new byte[dataLen + 4];
-			payload[0] = getAddressByte();
-			payload[1] = camByte2;
-			payload[2] = cmdByte;
-			for (int i = 0; i < dataLen; i++) {
-				payload[i + 3] = data[i];
-			}
-			payload[dataLen + 3] = 0xFF;
-			msg.data = payload;
-			sendMessage(msg, more);
+		private void sendCommand(CommandType cmdType, byte[] data, string more = "") {
+			VMessage msg = new VMessage(MessageType.MSG_Command, cmdType, getAddressByte(), data, more);
+			SendMsg(msg);
 		}
 
-		private  void sendInquiry(MsgType type) {
-			VMessage msg = new VMessage();
-			msg.type = type;
-			msg.data = new byte[] { getAddressByte(), 0x09, 0x04, MessageByte[(int)type], 0xFF };
-			sendMessage(msg);
+		//private void sendInquiry(MsgType type) {
+		private void sendInquiry(CommandType cmdType, string more = "") {
+			VMessage msg = new VMessage(MessageType.MSG_Inquiry, cmdType, getAddressByte(), new byte[0], more);
+			SendMsg(msg);
 		}
 
 		private  void sendDeviceTypeInquiry() {
-			VMessage msg = new VMessage();
-			msg.type = MsgType.IDeviceType;
-			msg.data = new byte[] { getAddressByte(), 0x09, 0x00, 0x02, 0xFF };
-			sendMessage(msg);
+			sendInquiry(CommandType.INQ_DeviceType, "Device Type Inquiry");
 		}
 		private  void broadcastAddress() {
-			VMessage msg = new VMessage();
-			msg.type = MsgType.CAddressSet;
-			msg.data = new byte[] { 0x88, 0x30, 0x01, 0xFF };
-			sendMessage(msg);
+			VMessage msg = new VMessage(MessageType.MSG_Broadcast, CommandType.BDC_AddressSet, 0x88, new byte[] { 0x30, 0x01 });
+			SendMsg(msg);
 		}
 		#endregion
 
@@ -507,7 +603,7 @@ namespace ViscaUI {
 				receiveQueue.Enqueue(b);
 			}
 			while (receiveQueue.Contains(0xFF)) {
-				List<byte> response = new List<byte>();
+				List<byte> response = new();
 				do {
 					response.Add(receiveQueue.Dequeue());
 				} while (response[response.Count - 1] != 0xFF);
@@ -528,24 +624,16 @@ namespace ViscaUI {
 					receiveString = "Unknown";
 				}
 				if (receiveString.Length > 0) {
-					responseListAdd($"{receiveString.PadRight(25)} - {str}");
+					dfo($"{receiveString.PadRight(30)} - {str}");
 				}
 			}
 
-			if (lastMsg == MsgType.None) {
+			if (lastCmdType == CommandType.None) {
 				if (!msgQueue.Empty) {
 					VMessage msg = new VMessage();
 					msgQueue.Dequeue(ref msg);
-					sendMessage(msg);
+					SendMsg(msg);
 				}
-			//} else if (DateTime.Now - lastSend > TimeSpan.FromSeconds(15)) {
-			//	responseListAdd(DateTime.Now.ToLongTimeString() + " - " + lastSend.ToLongTimeString());
-			//	ShowConnectedState(false);
-			//	_service.Disconnect();
-			//	setControlsState();
-			//	responseListAdd("Port closed - no response from " + lastMsg.ToString());
-			//	ShowMessage("Port closed - no response from " + lastMsg.ToString());
-			//	lastMsg = MsgType.None;
 			}
 		}
 
@@ -556,10 +644,10 @@ namespace ViscaUI {
 			}
 			_service.Disconnect();
 			msgQueue.Clear();
-			lastMsg = MsgType.None;
+			lastCmdType = CommandType.None;
 			ShowConnectedState(false);
 			setControlsState();
-			ShowMessage("Port closed - no response from " + lastMsg.ToString());
+			ShowMessage("Port closed - no response from " + lastCmdType.ToString());
 		}
 
 		private async void ShowMessage(string msg) {
@@ -612,7 +700,7 @@ namespace ViscaUI {
 				rtn = $"ACK: Device {dev}";
 			} else if ((response[1] & 0xF0) == 0x50) {
 				rtn = $"FIN: Device {dev}";
-				lastMsg = MsgType.None;
+				lastCmdType = CommandType.None;
 			}
 
 			return rtn;
@@ -624,9 +712,9 @@ namespace ViscaUI {
 				if ((response[0] == 0x88) && (response[1] == 0x30)) {
 					rtn = "Address Set Return";
 					numDevices = (int)(response[2]) - 1;
-					lastMsg = MsgType.None;
+					lastCmdType = CommandType.None;
 					ShowValidCameras(numDevices);
-					sendInquiry(MsgType.IPower);
+					sendInquiry(CommandType.INQ_DeviceType);
 				} else if ((response[0] & 0x8F) == 0x80) {
 					if ((response[1] & 0xF0) == 0x60) {    // error message
 						Debug.WriteLine("Error message received");
@@ -636,40 +724,40 @@ namespace ViscaUI {
 								foreach (byte b in response) {
 									rtn += b.ToString("X2");
 								}
-								lastMsg = MsgType.None;
+								lastCmdType = CommandType.None;
 								break;
 							case 0x02:
 								rtn = "invalid parameters or format command: ";
 								foreach (byte b in response) {
 									rtn += b.ToString("X2");
 								}
-								lastMsg = MsgType.None;
+								lastCmdType = CommandType.None;
 								break;
 							default:
 								rtn = "command error: ";
 								foreach (byte b in response) {
 									rtn += b.ToString("X2");
 								}
-								lastMsg = MsgType.None;
+								lastCmdType = CommandType.None;
 								break;
 						}
 					} else if (response[1] == 0x50) {  // inquiry response
-						switch (lastMsg) {
-							case MsgType.IPower:
+						switch (lastCmdType) {
+							case CommandType.INQ_Power:
 								if (response[2] == 0x02) {
 									ShowPowerState(true);
 									rtn = "Power On";
-									sendInquiry(MsgType.IAEMode);
-									sendInquiry(MsgType.IFocusMode);
-									sendInquiry(MsgType.IBalanceMode);
+									sendInquiry(CommandType.INQ_AEMode);
+									sendInquiry(CommandType.INQ_FocusMode);
+									sendInquiry(CommandType.INQ_BalanceMode);
 								} else if (response[2] == 0x03) {
 									ShowPowerState(false);
 									rtn = "Power Off";
 								}
-								lastMsg = MsgType.None;
+								lastCmdType = CommandType.None;
 								setControlsState();
 								break;
-							case MsgType.IFocusMode:
+							case CommandType.INQ_FocusMode:
 								if (response[2] == 0x02) {
 									ShowFocusState(true);
 									rtn = "Focus Auto";
@@ -677,9 +765,9 @@ namespace ViscaUI {
 									ShowFocusState(false);
 									rtn = "Focus Manual";
 								}
-								lastMsg = MsgType.None;
+								lastCmdType = CommandType.None;
 								break;
-							case MsgType.IAEMode:
+							case CommandType.INQ_AEMode:
 								if (response[2] == 0x00) {
 									setBrightType(false);
 									rtn = "Exposure Auto ";
@@ -687,9 +775,9 @@ namespace ViscaUI {
 									setBrightType(true);
 									rtn = "Exposure Bright";
 								}
-								lastMsg = MsgType.None;
+								lastCmdType = CommandType.None;
 								break;
-							case MsgType.IBacklightMode:
+							case CommandType.INQ_BacklightMode:
 								if (response[2] == 0x02) {
 									ShowBacklit(true);
 									rtn = "Backlight On";
@@ -697,9 +785,9 @@ namespace ViscaUI {
 									ShowBacklit(false);
 									rtn = "Backlight Off";
 								}
-								lastMsg = MsgType.None;
+								lastCmdType = CommandType.None;
 								break;
-							case MsgType.IBalanceMode:
+							case CommandType.INQ_BalanceMode:
 								BalanceType bal = BalanceType.Auto;
 								switch (response[2]) {
 									case 0:
@@ -711,25 +799,16 @@ namespace ViscaUI {
 									case 2:
 										bal = BalanceType.Outdoor;
 										break;
-									case 3:
-										bal = BalanceType.OnePush;
-										break;
-									case 4:
-										if (currentMode == Mode.D70) {
-											bal = BalanceType.AutoTracing;
-										}
-										break;
 									case 5:
 										if (currentMode == Mode.D70) {
 											bal = BalanceType.Manual;
 										}
 										break;
 								}
-								//setBalanceType(bal);
 								rtn = "Balance Mode: " + bal.ToString();
-								lastMsg = MsgType.None;
+								lastCmdType = CommandType.None;
 								break;
-							case MsgType.IExpCompOn:
+							case CommandType.INQ_ExpCompOn:
 								Debug.WriteLine("exp comp return");
 								bool on = false;
 								switch (response[2]) {
@@ -742,8 +821,8 @@ namespace ViscaUI {
 								}
 								rtn = "Exp Comp: " + (on ? "On" : "Off");
 								displayExpComp(on);
-								lastMsg = MsgType.None;
-								sendInquiry(MsgType.IExpCompPos);
+								lastCmdType = CommandType.None;
+								sendInquiry(CommandType.INQ_ExpCompPos);
 								break;
 							}
 						}
@@ -763,45 +842,45 @@ namespace ViscaUI {
 		private  string handle7ByteResponse(List<byte> response) {
 			string rtn = "";
 			if (response[1] == 0x50) {  // inquiry response
-				if (lastMsg == MsgType.IBrightPos) {
+				if (lastCmdType == CommandType.INQ_BrightPos) {
 					int pos = ((response[4] << 4) | response[5]);
 					ShowExposure(pos);
 					rtn = $"Bright {pos}";
-					lastMsg = MsgType.None;
+					lastCmdType = CommandType.None;
 					//irisLabel.Text = IrisStrings[pos];
 					//gainLabel.Text = GainStrings[pos];
-				} else if (lastMsg == MsgType.IBalanceRed) {
+				} else if (lastCmdType == CommandType.INQ_BalanceRed) {
 					int pos = ((response[4] << 4) | response[5]);
 					rtn = $"Red balance {pos}";
-					lastMsg = MsgType.None;
+					lastCmdType = CommandType.None;
 					//redLabel.Text = pos.ToString();
-				} else if (lastMsg == MsgType.IBalanceBlue) {
+				} else if (lastCmdType == CommandType.INQ_BalanceBlue) {
 					int pos = ((response[4] << 4) | response[5]);
 					rtn = $"Blue balance {pos}";
-					lastMsg = MsgType.None;
+					lastCmdType = CommandType.None;
 					//blueLabel.Text = pos.ToString();
-				} else if (lastMsg == MsgType.IExpCompPos) {
+				} else if (lastCmdType == CommandType.INQ_ExpCompPos) {
 					int pos = ((response[4] << 4) | response[5]);
 					ShowExposureComp(pos);
 					rtn = $"Exp Comp {pos}";
-					lastMsg = MsgType.None;
+					lastCmdType = CommandType.None;
 					//expCompLabel.Text = ExpCompStrings[pos];
-				} else if (lastMsg == MsgType.IShutter) {
-					int pos = ((response[4] << 4) | response[5]);
-					rtn = $"Shutter Speed {pos}";
-					lastMsg = MsgType.None;
-					//shutterLabel.Text = ShutterStrings[pos];
-				} else if (lastMsg == MsgType.IIris) {
-					int pos = ((response[4] << 4) | response[5]);
-					rtn = $"Iris {pos}";
-					lastMsg = MsgType.None;
-					//irisLabel.Text = IrisD30Strings[pos];
-				} else if (lastMsg == MsgType.IGain) {
-					int pos = ((response[4] << 4) | response[5]);
-					rtn = $"Gain {pos}";
-					lastMsg = MsgType.None;
-					//gainLabel.Text = GainD30Strings[pos];
-					//}
+				//} else if (lastCmdType == CommandType.INQ_Shutter) {
+				//	int pos = ((response[4] << 4) | response[5]);
+				//	rtn = $"Shutter Speed {pos}";
+				//	lastCmdType = CommandType.None;
+				//	//shutterLabel.Text = ShutterStrings[pos];
+				//} else if (lastCmdType == CommandType.INQ_Iris) {
+				//	int pos = ((response[4] << 4) | response[5]);
+				//	rtn = $"Iris {pos}";
+				//	lastCmdType = CommandType.None;
+				//	//irisLabel.Text = IrisD30Strings[pos];
+				//} else if (lastCmdType == CommandType.INQ_Gain) {
+				//	int pos = ((response[4] << 4) | response[5]);
+				//	rtn = $"Gain {pos}";
+				//	lastCmdType = CommandType.None;
+				//	//gainLabel.Text = GainD30Strings[pos];
+				//	//}
 				}
 			}
 
@@ -810,9 +889,47 @@ namespace ViscaUI {
 
 		private  string handle10ByteResponse(List<byte> response) {
 			string rtn = "";
-			int dev = response[0] & 0x7;
-			int model = ((int)response[4]) << 8 + response[5];
-			rtn = "Device " + dev.ToString() + " Type: " + model.ToString("X2");
+			switch (lastCmdType) {
+				case CommandType.INQ_DeviceType:
+					byte dev = (byte)((response[0] >> 4) & 0x7);
+					int vendorId = ((int)response[2] << 8) + response[3];
+					int modelId = ((int)response[4] << 8) + response[5];
+					int version = ((int)response[6] << 8) + response[7];
+					string vendorStr = vendorMap.ContainsKey(vendorId) ? vendorMap[vendorId] : "Unknown";
+					string modelStr = "Unknown";
+					if (vendorStr == "Sony") {
+						modelStr = sonyModelMap.ContainsKey(modelId) ? sonyModelMap[modelId] : "Unknown";
+					} else if (vendorStr == "AVer") {
+						modelStr = averModelMap.ContainsKey(modelId) ? averModelMap[modelId] : "Unknown";
+					}
+					string versionStr = version.ToString("X2");
+					uint restrict = 0;
+					if (modelStr  == "EVI-D30") {
+						restrict |= NoWBManual;
+						restrict |= NoBrightDirect;
+					}
+					DeviceInfo devInfo = new DeviceInfo(dev, "", vendorStr, modelStr, versionStr, restrict);
+					deviceInfos.Add(devInfo);
+					string cameraStr = " " + vendorStr + "/" + modelStr;
+					rtn = "Cam: " + dev.ToString() + cameraStr;
+					if (dev == 1) {
+						this.DispatcherQueue.TryEnqueue(() => {
+							vendorModel.Text = cameraStr;
+						});
+					}
+					lastCmdType = CommandType.None;
+					if (dev < numDevices) {
+						deviceId++;
+						sendInquiry(CommandType.INQ_DeviceType);
+					} else {
+						deviceId = 1;
+						sendInquiry(CommandType.INQ_Power);
+					}
+					break;
+			}
+			//	int dev = response[0] & 0x7;
+			//int model = ((int)response[4]) << 8 + response[5];
+			//rtn = "Device " + dev.ToString() + " Type: " + model.ToString("X2");
 
 			return rtn;
 		}
@@ -820,25 +937,25 @@ namespace ViscaUI {
 		private  void responseListAdd(string text) {
 			this.DispatcherQueue.TryEnqueue(() => {
 				responseListBox.Items.Insert(0, text);
-				dfo(text);
+				//dfo(text);
 			});
 		}
 		#endregion
 
 		#region Pan Tilt
 		private  void panTiltStop() {
-			byte[] d = { 0x01, panRate, tiltRate, 0x03, 0x03 };
-			sendCommand(panTiltCmd, d, MsgType.CPanTilt, "stop");
+			byte[] d = { panRate, tiltRate, 0x03, 0x03 };
+			sendCommand(CommandType.CMD_PanTilt, d, "stop");
 		}
 
 		private  void panTiltStart(byte b6, byte b7) {
-			byte[] d = {  0x01, panRate, tiltRate, b6, b7 };
-			sendCommand(panTiltCmd, d, MsgType.CPanTilt, $"p {panRate}, t {tiltRate}");
+			byte[] d = { panRate, tiltRate, b6, b7 };
+			sendCommand(CommandType.CMD_PanTilt, d, $"p {panRate}, t {tiltRate}");
 		}
 
 		private  void CenterBtnClick(object sender, RoutedEventArgs e) {
-			byte[] d = { 0x04 };
-			sendCommand(panTiltCmd, d, MsgType.CPanTilt, "center");
+			byte[] d = { };
+			sendCommand(CommandType.CMD_PanTiltHome, d, "center");
 		}
 
 		private void ptRect_MouseDown(object sender, PointerRoutedEventArgs e) {
@@ -910,20 +1027,20 @@ namespace ViscaUI {
 		#region Zooom
 		private void zoomStop() {
 			responseListAdd("zoom stop");
-			byte[] d = { 0x07, 0x00 };
-			sendCommand(normCmd, d, MsgType.CZoom, "stop");
+			byte[] d = { 0x00 };
+			sendCommand(CommandType.CMD_Zoom, d, "stop");
 		}
 
 		private void zoomIn() {
 			byte cmd = (byte)(0x20 | zoomRate);
-			byte[] d = { 0x07, cmd };
-			sendCommand(normCmd, d, MsgType.CZoom, $"in {zoomRate}");
+			byte[] d = { cmd };
+			sendCommand(CommandType.CMD_Zoom, d, $"in {zoomRate}");
 		}
 
 		private void zoomOut() {
 			byte cmd = (byte)(0x30 | zoomRate);
-			byte[] d = { 0x07, cmd };
-			sendCommand(normCmd, d, MsgType.CZoom, $"out {zoomRate}");
+			byte[] d = { cmd };
+			sendCommand(CommandType.CMD_Zoom, d, $"out {zoomRate}");
 		}
 
 		private void zmRect_MouseDown(object sender, PointerRoutedEventArgs e) {
@@ -992,27 +1109,27 @@ namespace ViscaUI {
 
 		private void setFocusType(bool manual) {
 			focusRect.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
-			if (lastMsg == MsgType.None) {
+			if (lastCmdType == CommandType.None) {
 				byte[] d = { 0x38, (byte)(manual ? 0x03 : 0x02) };
-				sendCommand(normCmd, d, MsgType.CFocusMode, $"{(manual ? "manual" : "auto")}");
+				sendCommand(CommandType.CMD_FocusMode, d, $"{(manual ? "manual" : "auto")}");
 			}
 		}
 
 		private void focusStop() {
-			byte[] d = { 0x08, 0x00 };
-			sendCommand(normCmd, d, MsgType.CFocus, "stop");
+			byte[] d = { 0x00 };
+			sendCommand(CommandType.CMD_Focus, d, "stop");
 		}
 
 		private void focusIn() {
 			byte cmd = (byte)(0x30 | focusRate);
-			byte[] d = { 0x08, cmd };
-			sendCommand(normCmd, d, MsgType.CFocus, $"in {focusRate}");
+			byte[] d = { cmd };
+			sendCommand(CommandType.CMD_Focus, d, $"in {focusRate}");
 		}
 
 		private void focusOut() {
 			byte cmd = (byte)(0x20 | focusRate);
-			byte[] d = { 0x08, cmd };
-			sendCommand(normCmd, d, MsgType.CFocus, $"out {focusRate}");
+			byte[] d = { cmd };
+			sendCommand(CommandType.CMD_Focus, d	, $"out {focusRate}");
 		}
 		private void FocusManualClick(object sender, RoutedEventArgs e) {
 			setFocusType(focusManual.IsChecked == true);
@@ -1076,7 +1193,18 @@ namespace ViscaUI {
 			RadioButton? rb = sender as RadioButton;
 			if (rb != null && rb.IsChecked == true) {
 				string? str = rb.Content.ToString();
-				deviceId = (str is not null) ? int.Parse(str) : 1;
+				deviceId = (str is not null) ? uint.Parse(str) : 1;
+				if (deviceId <= deviceInfos.Count) {
+					string[] presets = Config.GetPresets(deviceId - 1);
+					for (int i = 0; i < presets.Length; i++) {
+						presetTexts[i].Text = presets[i];
+					}
+					DeviceInfo info = deviceInfos[(int)deviceId - 1];
+					string cameraStr = " " + info.vendor + "/" + info.model;
+					vendorModel.Text = cameraStr;
+
+					sendInquiry(CommandType.INQ_Power);
+				}
 			}
 		}
 
@@ -1138,9 +1266,9 @@ namespace ViscaUI {
 				presetPanels[number].Background = new SolidColorBrush(Colors.Maroon);
 			});
 
-			byte[] d = { 0x3F, 0x01, number };
-			d[1] = settingPreset ? (byte)0x01 : (byte)0x02;
-			sendCommand(normCmd, d, MsgType.CMemory, $"preset {number + 1}");
+			byte[] d = { 0x01, number };
+			d[0] = settingPreset ? (byte)0x01 : (byte)0x02;
+			sendCommand(CommandType.CMD_Memory, d, $"preset {number + 1}");
 
 			if (presetTimer1 is not null) {
 				presetTimer1.Enabled = false;
@@ -1149,23 +1277,22 @@ namespace ViscaUI {
 			lastPresetNumber = number;
 
 			if (!settingPreset) {
-				sendInquiry(MsgType.IAEMode);
-				sendInquiry(MsgType.IFocusMode);
-				sendInquiry(MsgType.IBalanceMode);
-				sendInquiry(MsgType.IExpCompOn);
+				sendInquiry(CommandType.INQ_AEMode);
+				sendInquiry(CommandType.INQ_FocusMode);
+				sendInquiry(CommandType.INQ_BalanceMode);
+				sendInquiry(CommandType.INQ_ExpCompOn);
 			}
 
 			settingPreset = false;
 		}
 
 		private void PresetTextChanged(object sender, RoutedEventArgs e) {
-			TextBox? tb = sender as TextBox;
-			if (tb != null) {
-				int index = presetTexts.IndexOf(tb);
-				if (index >= 0) {
-					Config.SetPreset((uint)index, tb.Text);
-				}
+			string[] texts = new string[presetTexts.Count];
+			for (int i = 0; i < presetTexts.Count; i++) {
+				texts[i] = presetTexts[i].Text;
 			}
+
+			Config.SetPresets(deviceId - 1, texts);
 		}
 		#endregion
 
@@ -1187,7 +1314,7 @@ namespace ViscaUI {
 		private void ShowExposure(int pos) {
 			this.DispatcherQueue.TryEnqueue(() => {
 				expSlider.Value = pos;
-				expText.Text = $"{IrisStrings[pos]}-{GainStrings[pos]}";
+				//expText.Text = $"{IrisStrings[pos]}-{GainStrings[pos]}";
 			});
 		}
 
@@ -1206,24 +1333,23 @@ namespace ViscaUI {
 				ShowExposure(0);
 			}
 
-			byte[] d = { 0x39, (byte)(manual ? 0x0D : 0x00) };
-			sendCommand(normCmd, d, MsgType.CBright, $"mode {(manual ? "manual" : "auto")}");
+			byte[] d = { (byte)(manual ? 0x0D : 0x00) };
+			sendCommand(CommandType.CMD_ExposureMode, d, $"{(manual ? "Manual" : "Auto")}");
 
 			if (!manual) {
-				sendInquiry(MsgType.IBacklightMode);
+				sendInquiry(CommandType.INQ_BacklightMode);
 			} else {
-				sendInquiry(MsgType.IBrightPos);
-				sendInquiry(MsgType.IShutter);
+				sendInquiry(CommandType.INQ_BrightPos);
 			}
 		}
 
 		private void ExpSliderChanged(object sender, RangeBaseValueChangedEventArgs e) {
-			if (lastMsg == MsgType.None) {
+			if (lastCmdType == CommandType.None) {
 				int value = (int)e.NewValue;
 				byte p = (byte)((value >> 4) & 1);
 				byte q = (byte)(value & 0x0F);
-				byte[] d = { 0x4D, 0x00, 0x00, p, q };
-				sendCommand(normCmd, d, MsgType.CBright, $"exposure {value}");
+				byte[] d = { 0x00, 0x00, p, q };
+				sendCommand(CommandType.CMD_ExposurePos, d, $"{value}");
 				ShowExposure(value);
 			}
 		}
@@ -1236,9 +1362,9 @@ namespace ViscaUI {
 		}
 
 		private void setBacklight(bool on) {
-			if (lastMsg == MsgType.None) {
-				byte[] d = { 0x33, (byte)(on ? 0x02 : 0x03), 0xFF };
-				sendCommand(normCmd, d, MsgType.CBacklight, $"{(on ? "on" : "off")}");
+			if (lastCmdType == CommandType.None) {
+				byte[] d = { (byte)(on ? 0x02 : 0x03), 0xFF };
+				sendCommand(CommandType.CMD_Backlight, d, $"{(on ? "on" : "off")}");
 			}
 		}
 
@@ -1253,10 +1379,10 @@ namespace ViscaUI {
 			displayExpComp(on);
 
 			byte[] d = { 0x3E, (byte)(on ? 0x02 : 0x03) };
-			sendCommand(normCmd, d, MsgType.CExpCompOn, $"{(on ? "on" : "off")}");
+			sendCommand(CommandType.CMD_ExpCompOn, d, $"{(on ? "on" : "off")}");
 
 			if (on) {
-				sendInquiry(MsgType.IExpCompPos);
+				sendInquiry(CommandType.INQ_ExpCompPos);
 			}
 		}
 
@@ -1270,7 +1396,7 @@ namespace ViscaUI {
 		private void ShowExposureComp(int pos) {
 			this.DispatcherQueue.TryEnqueue(() => {
 				expCompSlider.Value = pos;
-				expCompText.Text = ExpCompStrings[pos];
+				//expCompText.Text = ExpCompStrings[pos];
 			});
 		}
 
@@ -1279,30 +1405,27 @@ namespace ViscaUI {
 			byte p = 0;
 			byte q = (byte)(value & 0x0f);
 			byte[] d = { 0x4E, 0x00, 0x00, p, q };
-			sendCommand(normCmd, d, MsgType.CExpCompPos, $"{value}");
+			sendCommand(CommandType.CMD_ExpCompPos, d, $"{value}");
 			ShowExposureComp(value);
 		}
 		#endregion
 
 		#region White Balance
-		private void balanceSetup(Mode mode) {
+		private void balanceSetup() {
 			wbSelectCombo.Items.Clear();
-			wbSelectCombo.Items.Add("Auto");
-			wbSelectCombo.Items.Add("Indoor");
-			wbSelectCombo.Items.Add("Outdoor");
-			wbSelectCombo.Items.Add("One Push");
-			bool mode70 = (mode == Mode.D70);
-			if (mode70) {
-				wbSelectCombo.Items.Add("Auto Tracing");
-				wbSelectCombo.Items.Add("Manual");
+			wbSelectCombo.Items.Add(balanceStrMap[BalanceType.Auto]);
+			wbSelectCombo.Items.Add(balanceStrMap[BalanceType.Indoor]);
+			wbSelectCombo.Items.Add(balanceStrMap[BalanceType.Outdoor]);
+			if (deviceId <= deviceInfos.Count) {
+				DeviceInfo info = deviceInfos[(int)deviceId - 1];
+				uint restrict = deviceInfos[(int)deviceId - 1].restrict;
+				bool manualOk = ((restrict & NoWBManual) == 0);
+				if (manualOk) {
+					wbSelectCombo.Items.Add(balanceStrMap[BalanceType.Manual]);
+				}
+
+				wbSelectCombo.SelectedIndex = 0;
 			}
-
-			wbSelectCombo.SelectedIndex = 0;
-
-			wbRedSlider.Visibility = mode70 ? Visibility.Visible : Visibility.Collapsed;
-			wbRedText.Visibility = mode70 ? Visibility.Visible : Visibility.Collapsed;
-			wbBlueSlider.Visibility = mode70 ? Visibility.Visible : Visibility.Collapsed;
-			wbBlueText.Visibility = mode70 ? Visibility.Visible : Visibility.Collapsed;
 		}
 
 		private void setBalanceType(BalanceType balance) {
@@ -1310,24 +1433,18 @@ namespace ViscaUI {
 
 			if (wbSelectCombo.Items.Count > 0) {
 				//wbSelectCombo.SelectedIndex = (int)balance;
-				wbTriggerBtn.IsEnabled = (balance == BalanceType.OnePush);
-				bool manual = (balance == BalanceType.Manual);
+				bool manual = ((BalanceType)balance == BalanceType.Manual);
 				wbRedSlider.IsEnabled = manual;
 				wbBlueSlider.IsEnabled = manual;
 
-				byte[] d = { 0x35, BalanceCmd[(int)balance] };
-				sendCommand(normCmd, d, MsgType.CBalanceMode, BalanceStrs[(int)balance]);
+				//byte[] d = { BalanceCmd[(int)balance] };
+				//sendCommand(CommandType.CMD_BalanceMode, d, $"{BalanceStrs[(int)balance]}");
 
-				if (balanceType == BalanceType.Manual) {
-					sendInquiry(MsgType.IBalanceRed);
-					sendInquiry(MsgType.IBalanceBlue);
+				if (manual) {
+					sendInquiry(CommandType.INQ_BalanceRed);
+					sendInquiry(CommandType.INQ_BalanceBlue);
 				}
 			}
-		}
-
-		private void BalTriggerBtnClick(object sender, RoutedEventArgs e) {
-			byte[] d = { 0x10, 0x05 };
-			sendCommand(normCmd, d, MsgType.CBalanceTrigger);
 		}
 
 		private void ShowGainText(TextBox text, int value) {
@@ -1344,8 +1461,8 @@ namespace ViscaUI {
 
 				byte p = (byte)(value >> 4);
 				byte q = (byte)(value & 0x0f);
-				byte[] d = { 0x43, 0x00, 0x00, p, q };
-				sendCommand(normCmd, d, MsgType.CBalanceRed, $"{value}");
+				byte[] d = { 0x00, 0x00, p, q };
+				sendCommand(CommandType.CMD_BalanceRed, d, $"{value}");
 				ShowGainText(wbRedText, value);
 			}
 		}
@@ -1355,23 +1472,25 @@ namespace ViscaUI {
 				int value = (int)e.NewValue;
 				byte p = (byte)(value >> 4);
 				byte q = (byte)(value & 0x0f);
-				byte[] d = { 0x44, 0x00, 0x00, p, q };
-				sendCommand(normCmd, d, MsgType.CBalanceBlue, $"{value}");
+				byte[] d = { 0x00, 0x00, p, q };
+				sendCommand(CommandType.CMD_BalanceBlue, d, $"{value}");
 				ShowGainText(wbBlueText, value);
 			}
 		}
 
 		private void BalSelectChanged(object sender, SelectionChangedEventArgs e) {
-			if (loaded) {
+			if (loaded && powerOn) {
 				BalanceType typ = BalanceType.Auto;
 				string? bal = wbSelectCombo.SelectedItem as string;
-				for (int i = 0; i < BalanceStrings.Length; i++) {
-					if (bal == BalanceStrings[i]) {
-						typ = (BalanceType)i;
+				foreach (KeyValuePair<BalanceType, string> kvp in balanceStrMap) {
+					if (kvp.Value == bal) {
+						typ = kvp.Key;
 					}
 				}
 
 				setBalanceType(typ);
+				byte[] d = { balanceCmdMap[typ] };
+				sendCommand(CommandType.CMD_BalanceMode, d, $"{balanceStrMap[typ]}");
 			}
 		}
 

@@ -1,4 +1,6 @@
-﻿using System.Drawing;
+﻿using System.ComponentModel.Design;
+using System.Drawing;
+using System.Text.Json;
 using Windows.Storage;
 
 namespace ViscaUI {
@@ -9,14 +11,15 @@ namespace ViscaUI {
 		const string SpeedStr = "Speed";
 		const string LocXStr = "LocX";
 		const string LocYStr = "LocY";
-		const string ModeStr = "Mode";
+		//const string ModeStr = "Mode";
 		const string DebugStr = "Debug";
 		const string MiniStr = "Mini";
-		const string InitStr = "Init";
+		//const string InitStr = "Init";
 		const string LogStr = "Log";
-		const string InstanceStr = "Instance";
+		//const string InstanceStr = "Instance";
 		readonly static string[] CameraStrs = [ "Camera0", "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6" ];
-		readonly static string[] PresetStrs = [ "Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5" ];
+		readonly static string[] PresetStrs = ["Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5"];
+		readonly static string[] PresetAry = ["PresetCam1", "PresetCam2", "PresetCam3", "PresetCam4", "PresetCam5", "PresetCam6", "PresetCam7"];
 		const string CalibratedStr = "Calibrated";
 		const string CalibrationXMinStr = "CalibrationXMin";
 		const string CalibrationXMaxStr = "CalibrationXMax";
@@ -45,6 +48,15 @@ namespace ViscaUI {
 			return rtn;
 		}
 
+		static string[] GetArray(string keyStr) {
+			string[] result = new string[] { "", "", "", "", "", "" };
+			var localSettings = ApplicationData.Current.LocalSettings;
+			if (localSettings.Values.TryGetValue(keyStr, out object storedValue) && storedValue is string jsonString) {
+				result = JsonSerializer.Deserialize<string[]>(jsonString);
+			}
+			return result;
+		}
+
 		static bool SetBool(string keyStr, bool value) {
 			var localSettings = ApplicationData.Current.LocalSettings;
 			localSettings.Values[keyStr] = value;
@@ -62,11 +74,17 @@ namespace ViscaUI {
 			localSettings.Values[keyStr] = value;
 			return value;
 		}
-		static public bool Init
-		{
-			get { return GetBool(InitStr, false); } 
-			set { SetBool(InitStr, value); }
+
+		static void SetArray(string keyStr, string[] value) {
+			var localSettings = ApplicationData.Current.LocalSettings;
+			string jsonString = JsonSerializer.Serialize(value);
+			localSettings.Values[keyStr] = jsonString;
 		}
+		//static public bool Init
+		//{
+		//	get { return GetBool(InitStr, false); } 
+		//	set { SetBool(InitStr, value); }
+		//}
 
 		static public string Port
 		{
@@ -108,11 +126,11 @@ namespace ViscaUI {
 			set { SetBool(MiniStr, value); }
 		}
 
-		static public Mode Mode
-		{
-			get { return (GetString(ModeStr, "D70") == "D30") ? Mode.D30 : Mode.D70; }
-			set { SetString(ModeStr, (value == Mode.D30) ? "D30" : "D70"); }
-		}
+		//static public Mode Mode
+		//{
+		//	get { return (GetString(ModeStr, "D70") == "D30") ? Mode.D30 : Mode.D70; }
+		//	set { SetString(ModeStr, (value == Mode.D30) ? "D30" : "D70"); }
+		//}
 
 		static public bool Calibrated {
 			get { return GetBool(CalibratedStr, false); }
@@ -165,8 +183,7 @@ namespace ViscaUI {
 			}
 		}
 
-		static public string GetPreset(uint n)
-		{
+		static public string GetPreset(uint n) {
 			if (n < 6) {
 				return GetString(PresetStrs[n], "");
 			} else {
@@ -174,18 +191,31 @@ namespace ViscaUI {
 			}
 		}
 
-		static public void SetPreset(uint n, string str)
-		{
+		static public void SetPreset(uint n, string str) {
 			if (n < 6) {
 				SetString(PresetStrs[n], str);
 			}
 		}
 
-		static public int Instance
-		{
-			get { return GetInt(InstanceStr, 0); }
-			set { SetInt(InstanceStr, value); }
+		static public string[] GetPresets(uint n) {
+			if (n < 7) {
+				return GetArray(PresetAry[n]);
+			} else {
+				return new string[] { "", "", "", "", "", "" };
+			}
 		}
+
+		static public void SetPresets(uint n, string[] str) {
+			if (n < 6) {
+				SetArray(PresetAry[n], str);
+			}
+		}
+
+		//static public int Instance
+		//{
+		//	get { return GetInt(InstanceStr, 0); }
+		//	set { SetInt(InstanceStr, value); }
+		//}
 
 		public Config()
 		{
