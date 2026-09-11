@@ -56,7 +56,7 @@ namespace ViscaUI {
 										0x3E, 0x4E, 0x35, 0x43, 0x44, 
 										0x00, 0x57, 0x39, 0x4d, 0x33, 
 										0x3F, 0x35, 0x43, 0x44, 0x3E, 
-										0x4E, 0x02 ];
+										0x4E, 0x02, 0x12 ];
 
 		readonly Dictionary<int, string> vendorMap = new Dictionary<int, string> {
 			{ 0x01, "Sony" },
@@ -170,6 +170,8 @@ namespace ViscaUI {
 
 		#endregion
 
+		private static System.Timers.Timer? panTiltTimer;
+
 		private static System.Timers.Timer? presetTimer;
 		Button? lastPreset = null;
 		int lastPresetNumber = 0;
@@ -223,17 +225,23 @@ namespace ViscaUI {
 					string[] logFiles = Directory.GetFiles(appDataPath, "Visca-*.log");
 
 					int logNo = 1;
+					DateTime oldestDate = DateTime.Now;
 
 					foreach (var file in logFiles) {
 						string fileName = Path.GetFileName(file);
 						int n = 0;
 						string nStr = fileName.Replace("Visca-", "").Replace(".log", "");
 						if (Int32.TryParse(nStr, out n)) {
-							logNo = int.Max(logNo, n);
+							DateTime created = File.GetCreationTime(file);
+							DateTime modified = File.GetLastWriteTime(file);
+							DateTime accessed = File.GetLastAccessTime(file);
+							if (created < oldestDate) {
+								oldestDate = created;
+								logNo = n;
+							}
 						}
 					}
 
-					logNo++;
 					if (logNo > 10) {
 						logNo = 1;
 					}
@@ -241,7 +249,6 @@ namespace ViscaUI {
 					initialized = true;
 
 					int nextLog = logNo;
-					//Config.Instance = nextLog;
 					string fName = $"Visca-{nextLog:D2}.log";
 					string fPath = Path.Combine(appDataPath, fName);
 					Debug.WriteLine($"log path: {fPath}");
@@ -535,6 +542,7 @@ namespace ViscaUI {
 		private void ProcessSendMsg(VMessage msg) {
 			lastCmdType = msg.cmdType;
 			List<byte> msgData = new();
+			byte typeByte = normCmd;
 
 			switch (msg.msgType) {
 				case MessageType.MSG_Broadcast:
@@ -543,13 +551,21 @@ namespace ViscaUI {
 				case MessageType.MSG_Command:
 					msgData.Add(getAddressByte());
 					msgData.Add(0x01);
-					msgData.Add((msg.cmdType == CommandType.CMD_PanTilt) ? panTiltCmd : normCmd);
+					if ((msg.cmdType == CommandType.CMD_PanTilt) || (msg.cmdType == CommandType.CMD_PanTiltRel)) {
+						typeByte = 0x06;
+					}
+					msgData.Add(typeByte);
 					msgData.Add((byte)CommandByte[(int)msg.cmdType]);
 					break;
 				case MessageType.MSG_Inquiry:
 					msgData.Add(getAddressByte());
 					msgData.Add(0x09);
-					msgData.Add((msg.cmdType == CommandType.INQ_DeviceType) ? (byte)0x00 : (byte)0x04);
+					if (msg.cmdType == CommandType.INQ_DeviceType) {
+						typeByte = 0x00;
+					} else if (msg.cmdType == CommandType.INQ_PanTiltPos) {
+						typeByte = 0x06;
+					}
+					msgData.Add(typeByte);
 					msgData.Add((byte)CommandByte[(int)msg.cmdType]);
 					break;
 				default:
@@ -620,6 +636,8 @@ namespace ViscaUI {
 					receiveString = "RCV: " + handle7ByteResponse(response);
 				} else if (response.Count == 10) {
 					receiveString = "RCV: " + handle10ByteResponse(response);
+				} else if (response.Count == 11) {
+					receiveString = "RCV: " + handle11ByteResponse(response);
 				} else {
 					receiveString = "Unknown";
 				}
@@ -927,10 +945,20 @@ namespace ViscaUI {
 					}
 					break;
 			}
-			//	int dev = response[0] & 0x7;
-			//int model = ((int)response[4]) << 8 + response[5];
-			//rtn = "Device " + dev.ToString() + " Type: " + model.ToString("X2");
 
+			return rtn;
+		}
+
+		private string handle11ByteResponse(List<byte> response) {
+			string rtn = "";
+			if (response[1] == 0x50) {  // inquiry response
+				if (lastCmdType == CommandType.INQ_PanTiltPos) {
+					int pan = ((response[2] << 12) | (response[3] << 8) | (response[4] << 4) | response[5]);
+					int tilt = ((response[6] << 12) | (response[7] << 8) | (response[8] << 4) | response[9]);
+					rtn = $"Pan {pan}, Tilt {tilt}";
+					lastCmdType = CommandType.None;
+				}
+			}
 			return rtn;
 		}
 
@@ -946,73 +974,68 @@ namespace ViscaUI {
 		private  void panTiltStop() {
 			byte[] d = { panRate, tiltRate, 0x03, 0x03 };
 			sendCommand(CommandType.CMD_PanTilt, d, "stop");
+			//sendInquiry(CommandType.INQ_PanTiltPos);
 		}
 
-		private  void panTiltStart(byte b6, byte b7) {
+		private void panTiltStart(byte b6, byte b7) {
 			byte[] d = { panRate, tiltRate, b6, b7 };
 			sendCommand(CommandType.CMD_PanTilt, d, $"p {panRate}, t {tiltRate}");
 		}
 
-		private  void CenterBtnClick(object sender, RoutedEventArgs e) {
+		private void panTiltMove(int pan, int tilt) {
+			byte[] d = { panRate, tiltRate, 0, 0, 0, 0, 0, 0, 0, 0 };
+			int panRem = pan * panRate;
+			for (int i = 3; i >= 0; i--) {
+				d[i + 2] = (byte)(panRem & 0x0F);
+				panRem >>= 4;
+			}
+			int tiltRem = tilt * tiltRate;
+			for (int i = 3; i >= 0; i--) {
+				d[i + 6] = (byte)(tiltRem & 0x0F);
+				tiltRem >>= 4;
+			}
+			sendCommand(CommandType.CMD_PanTiltRel, d, $"p {panRate}, t {tiltRate}");
+		}
+
+		private void CenterBtnClick(object sender, RoutedEventArgs e) {
 			byte[] d = { };
 			sendCommand(CommandType.CMD_PanTiltHome, d, "center");
 		}
 
+		PointerPoint ptStartPoint;
+
 		private void ptRect_MouseDown(object sender, PointerRoutedEventArgs e) {
-			ptRectDragging = true;
-			ptRect_MouseMove(sender, e);
+			Debug.WriteLine("mouse down");
+			panTiltTimer = new System.Timers.Timer(100);
+			panTiltTimer.Elapsed += PanTiltTimer_Tick;
+			panTiltTimer.Enabled = true;
+			ptStartPoint = e.GetCurrentPoint(ptRect);
+			Debug.WriteLine("mouse down end");
 		}
 
 		private void ptRect_MouseUp(object sender, PointerRoutedEventArgs e) {
+			Debug.WriteLine("mouse up");
 			ptRectDragging = false;
-			panTiltStop();
-			lastPanRate = 0;
-			lastTiltRate = 0;
-		}
-
-		const int ptRectWidth = 140;
-		const int ptInc = 10;
-		const int ptRectHeight = 120;
-		private static readonly int[] panRates = new[] { 0, 1, 3, 6, 10, 15, 24 };
-		private static readonly int[] tiltRates = new[] { 0, 1, 3, 6, 10, 1 };
-
-		private void ptRect_MouseMove(object sender, PointerRoutedEventArgs e) {
-			if (ptRectDragging) {
-				PointerPoint ptrPt = e.GetCurrentPoint(ptRect);
-				Point pos = ptrPt.Position;
+			if (panTiltTimer is not null) {
+				panTiltTimer.Stop();
+				panTiltTimer.Dispose();
+				PointerPoint point = e.GetCurrentPoint(ptRect);
+				Point pos = point.Position;
 				double x = Math.Max(Math.Min(pos.X, ptRectWidth), 0) - (ptRectWidth / 2);
 				double y = Math.Max(Math.Min(pos.Y, ptRectHeight), 0) - (ptRectHeight / 2);
-				double ax = Math.Abs(x);
-				double ay = Math.Abs(y);
-				int pr = 0;
-				int tr = 0;
+				panRate = getPanRate(x);
+				tiltRate = getTiltRate(y);
 
-				int xInd = Math.Min((int)(ax / ptInc), 6);
-				int yInd = Math.Min((int)(ay / ptInc), 5);
-				pr = panRates[xInd];
-				tr = tiltRates[yInd];
-
-				panRate = (byte)pr;
-				tiltRate = (byte)tr;
-
-				bool change = false;
-				if (lastPanRate != pr) {
-					lastPanRate = pr;
-					change = true;
+				int lr = 0;
+				int ud = 0;
+				if (panRate != 0) {
+					lr = ((x < 0) ? -1 : 1);
 				}
-				if (lastTiltRate != tr) {
-					lastTiltRate = tr;
-					change = true;
+				if (tiltRate != 0) {
+					ud = ((y < 0) ? -1 : 1);
 				}
-
-				if (change) {
-					if ((tr == 0) && (pr == 0)) {
-						panTiltStop();
-					} else {
-						byte lr = (byte)((pr == 0) ? 3 : ((x < 0) ? 1 : 2));
-						byte ud = (byte)((tr == 0) ? 3 : ((y < 0) ? 1 : 2));
-						panTiltStart(lr, ud);
-					}
+				if ((lr != 0) || (ud != 0)) {
+					panTiltMove(lr, ud);
 					if (lastPresetNumber != -1) {
 						this.DispatcherQueue.TryEnqueue(() => {
 							presetPanels[lastPresetNumber].Background = new SolidColorBrush(Colors.Transparent);
@@ -1020,6 +1043,88 @@ namespace ViscaUI {
 						});
 					}
 				}
+
+				// move camera small amount
+			} else {
+				panTiltStop();
+				lastPanRate = 0;
+				lastTiltRate = 0;
+			}
+			Debug.WriteLine("mouse up end");
+		}
+
+		private void PanTiltTimer_Tick(object? sender, object e) {
+			Debug.WriteLine("pt timer");
+			if (panTiltTimer is not null) {
+				Debug.WriteLine("pt timer not null");
+				panTiltTimer.Stop();
+				panTiltTimer.Dispose();
+				panTiltTimer = null;
+				ptRectDragging = true;
+				this.DispatcherQueue.TryEnqueue(() => {
+					ptHandleChange(ptStartPoint);
+				});
+			}
+			Debug.WriteLine("pt timer end");
+		}
+
+
+		const int ptRectWidth = 140;
+		const int ptInc = 10;
+		const int ptRectHeight = 120;
+		private static readonly int[] panRates = new[] { 0, 1, 3, 6, 10, 15, 24 };
+		private static readonly int[] tiltRates = new[] { 0, 1, 3, 6, 10, 1 };
+
+		private byte getPanRate(double x) {
+			double ax = Math.Abs(x);
+			int xInd = Math.Min((int)(ax / ptInc), 6);
+			return (byte)panRates[xInd];
+		}
+
+		private byte getTiltRate(double y) {
+			double ay = Math.Abs(y);
+			int yInd = Math.Min((int)(ay / ptInc), 5);
+			return (byte)tiltRates[yInd];
+		}
+
+		private void ptHandleChange(PointerPoint point) {
+			Point pos = point.Position;
+			double x = Math.Max(Math.Min(pos.X, ptRectWidth), 0) - (ptRectWidth / 2);
+			double y = Math.Max(Math.Min(pos.Y, ptRectHeight), 0) - (ptRectHeight / 2);
+			panRate = getPanRate(x);
+			tiltRate = getTiltRate(y);
+
+			bool change = false;
+			if (lastPanRate != panRate) {
+				lastPanRate = panRate;
+				change = true;
+			}
+			if (lastTiltRate != tiltRate) {
+				lastTiltRate = tiltRate;
+				change = true;
+			}
+
+			if (change) {
+				if ((panRate == 0) && (tiltRate == 0)) {
+					panTiltStop();
+				} else {
+					byte lr = (byte)((panRate == 0) ? 3 : ((x < 0) ? 1 : 2));
+					byte ud = (byte)((tiltRate == 0) ? 3 : ((y < 0) ? 1 : 2));
+					panTiltStart(lr, ud);
+				}
+				if (lastPresetNumber != -1) {
+					this.DispatcherQueue.TryEnqueue(() => {
+						presetPanels[lastPresetNumber].Background = new SolidColorBrush(Colors.Transparent);
+						lastPresetNumber = -1;
+					});
+				}
+			}
+		}
+
+		private void ptRect_MouseMove(object sender, PointerRoutedEventArgs e) {
+			if (ptRectDragging) {
+				PointerPoint ptrPt = e.GetCurrentPoint(ptRect);
+				ptHandleChange(ptrPt);
 			}
 		}
 		#endregion
@@ -1432,13 +1537,9 @@ namespace ViscaUI {
 			balanceType = balance;
 
 			if (wbSelectCombo.Items.Count > 0) {
-				//wbSelectCombo.SelectedIndex = (int)balance;
 				bool manual = ((BalanceType)balance == BalanceType.Manual);
 				wbRedSlider.IsEnabled = manual;
 				wbBlueSlider.IsEnabled = manual;
-
-				//byte[] d = { BalanceCmd[(int)balance] };
-				//sendCommand(CommandType.CMD_BalanceMode, d, $"{BalanceStrs[(int)balance]}");
 
 				if (manual) {
 					sendInquiry(CommandType.INQ_BalanceRed);

@@ -17,7 +17,7 @@ namespace ViscaUI
 		CMD_ExpCompOn, CMD_ExpCompPos, CMD_BalanceMode, CMD_BalanceRed, CMD_BalanceBlue,
 		INQ_Power, INQ_FocusMode, INQ_AEMode, INQ_BrightPos, INQ_BacklightMode,
 		INQ_Memory, INQ_BalanceMode, INQ_BalanceRed, INQ_BalanceBlue, INQ_ExpCompOn,
-		INQ_ExpCompPos, INQ_DeviceType
+		INQ_ExpCompPos, INQ_DeviceType, INQ_PanTiltPos
 	}
 
 	struct VMessage {
