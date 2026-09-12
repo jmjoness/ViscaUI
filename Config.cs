@@ -4,22 +4,19 @@ using System.Text.Json;
 using Windows.Storage;
 
 namespace ViscaUI {
-	enum Mode { D70, D30 };
+	//enum Mode { D70, D30 };
 
 	class Config {
 		const string PortStr = "Port";
 		const string SpeedStr = "Speed";
 		const string LocXStr = "LocX";
 		const string LocYStr = "LocY";
-		//const string ModeStr = "Mode";
 		const string DebugStr = "Debug";
 		const string MiniStr = "Mini";
-		//const string InitStr = "Init";
 		const string LogStr = "Log";
-		//const string InstanceStr = "Instance";
-		readonly static string[] CameraStrs = [ "Camera0", "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6" ];
-		readonly static string[] PresetStrs = ["Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5"];
-		readonly static string[] PresetAry = ["PresetCam1", "PresetCam2", "PresetCam3", "PresetCam4", "PresetCam5", "PresetCam6", "PresetCam7"];
+		readonly static string[] CameraStrs = new[] { "Camera0", "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6" };
+		readonly static string[] PresetStrs = new[] { "Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5" };
+		readonly static string[] PresetAry = new[] { "PresetCam1", "PresetCam2", "PresetCam3", "PresetCam4", "PresetCam5", "PresetCam6", "PresetCam7" };
 		const string CalibratedStr = "Calibrated";
 		const string CalibrationXMinStr = "CalibrationXMin";
 		const string CalibrationXMaxStr = "CalibrationXMax";
@@ -49,7 +46,7 @@ namespace ViscaUI {
 		}
 
 		static string[] GetArray(string keyStr) {
-			string[] result = new string[] { "", "", "", "", "", "" };
+			string[] result = new[] { "", "", "", "", "", "" };
 			var localSettings = ApplicationData.Current.LocalSettings;
 			if (localSettings.Values.TryGetValue(keyStr, out object storedValue) && storedValue is string jsonString) {
 				result = JsonSerializer.Deserialize<string[]>(jsonString);
@@ -80,11 +77,6 @@ namespace ViscaUI {
 			string jsonString = JsonSerializer.Serialize(value);
 			localSettings.Values[keyStr] = jsonString;
 		}
-		//static public bool Init
-		//{
-		//	get { return GetBool(InitStr, false); } 
-		//	set { SetBool(InitStr, value); }
-		//}
 
 		static public string Port
 		{
@@ -125,12 +117,6 @@ namespace ViscaUI {
 			get { return GetBool(MiniStr, false); }
 			set { SetBool(MiniStr, value); }
 		}
-
-		//static public Mode Mode
-		//{
-		//	get { return (GetString(ModeStr, "D70") == "D30") ? Mode.D30 : Mode.D70; }
-		//	set { SetString(ModeStr, (value == Mode.D30) ? "D30" : "D70"); }
-		//}
 
 		static public bool Calibrated {
 			get { return GetBool(CalibratedStr, false); }
@@ -201,7 +187,7 @@ namespace ViscaUI {
 			if (n < 7) {
 				return GetArray(PresetAry[n]);
 			} else {
-				return new string[] { "", "", "", "", "", "" };
+				return new[] { "", "", "", "", "", "" };
 			}
 		}
 
@@ -210,12 +196,6 @@ namespace ViscaUI {
 				SetArray(PresetAry[n], str);
 			}
 		}
-
-		//static public int Instance
-		//{
-		//	get { return GetInt(InstanceStr, 0); }
-		//	set { SetInt(InstanceStr, value); }
-		//}
 
 		public Config()
 		{

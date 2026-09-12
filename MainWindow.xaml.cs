@@ -7,17 +7,14 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging; // WinUI 3
-using Microsoft.WindowsAppSDK.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Windows.Foundation;
+using Windows.Security.Cryptography.Core;
 using WinRT.Interop;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -31,8 +28,8 @@ namespace ViscaUI {
 		enum BalanceType { Auto, Indoor, Outdoor, OnePush, AutoTrace, Manual }
 		static BalanceType balanceType = BalanceType.Auto;
 
-		readonly static Dictionary<BalanceType, string> balanceStrMap = new Dictionary<BalanceType, string> {
-			{ BalanceType.Auto, "Auto" },
+		readonly static Dictionary<BalanceType, string> balanceStrMap = new() {
+	  			{ BalanceType.Auto, "Auto" },
 			{ BalanceType.Indoor, "Indoor" },
 			{ BalanceType.Outdoor, "Outdoor" },
 			{ BalanceType.OnePush, "One Push" },
@@ -40,7 +37,7 @@ namespace ViscaUI {
 			{ BalanceType.Manual, "Manual" }
 		};
 
-		readonly static Dictionary<BalanceType, byte> balanceCmdMap = new Dictionary<BalanceType, byte> {
+		readonly static Dictionary<BalanceType, byte> balanceCmdMap = new() {
 			{ BalanceType.Auto, 0x00 },
 			{ BalanceType.Indoor, 0x01 },
 			{ BalanceType.Outdoor, 0x02 },
@@ -49,16 +46,43 @@ namespace ViscaUI {
 			{ BalanceType.Manual, 0x05 }
 		};
 
-		readonly static byte[] CommandByte = [ 0x00, 0x00, 0x00,
-										0x00, 0x00, 0x01, 0x03, 0x04, 
-										0x07, 0x3F, 
-										0x08, 0x38, 0x39, 0x4D, 0x33, 
-										0x3E, 0x4E, 0x35, 0x43, 0x44, 
-										0x00, 0x57, 0x39, 0x4d, 0x33, 
-										0x3F, 0x35, 0x43, 0x44, 0x3E, 
-										0x4E, 0x02, 0x12 ];
+		readonly static Dictionary<CommandType, byte> cmdByteMap = new() {
+			{ CommandType.None, 0x00 },
+			{ CommandType.BDC_AddressSet, 0x00 },
+			{ CommandType.BDC_IFClear, 0x00 },
+			{ CommandType.CMD_IFClear, 0x00 },
+			{ CommandType.CMD_Power, 0x00 },
+			{ CommandType.CMD_PanTilt, 0x01 },
+			{ CommandType.CMD_PanTiltRel, 0x03 },
+			{ CommandType.CMD_PanTiltHome, 0x04 },
+			{ CommandType.CMD_Zoom, 0x07 },
+			{ CommandType.CMD_Memory, 0x3F },
+			{ CommandType.CMD_Focus, 0x08 },
+			{ CommandType.CMD_FocusMode, 0x38 },
+			{ CommandType.CMD_ExposureMode, 0x39 },
+			{ CommandType.CMD_ExposurePos, 0x4D },
+			{ CommandType.CMD_Backlight, 0x33 },
+			{ CommandType.CMD_ExpCompOn, 0x3E },
+			{ CommandType.CMD_ExpCompPos, 0x4E },
+			{ CommandType.CMD_BalanceMode, 0x35 },
+			{ CommandType.CMD_BalanceRed, 0x43 },
+			{ CommandType.CMD_BalanceBlue, 0x44 },
+			{ CommandType.INQ_Power, 0x00 },
+			{ CommandType.INQ_FocusMode, 0x38 },
+			{ CommandType.INQ_AEMode, 0x39 },
+			{ CommandType.INQ_BrightPos, 0x4D },
+			{ CommandType.INQ_BacklightMode, 0x33 },
+			{ CommandType.INQ_Memory, 0x3F },
+			{ CommandType.INQ_BalanceMode, 0x35 },
+			{ CommandType.INQ_BalanceRed, 0x43 },
+			{ CommandType.INQ_BalanceBlue, 0x44 },
+			{ CommandType.INQ_ExpCompOn, 0x3E },
+			{ CommandType.INQ_ExpCompPos, 0x4E },
+			{ CommandType.INQ_DeviceType, 0x02 },
+			{ CommandType.INQ_PanTiltPos, 0x12 }
+		};
 
-		readonly Dictionary<int, string> vendorMap = new Dictionary<int, string> {
+		readonly Dictionary<int, string> vendorMap = new() {
 			{ 0x01, "Sony" },
 			{ 0x03, "Everet" },
 			{ 0x10, "Sony" },
@@ -70,7 +94,7 @@ namespace ViscaUI {
 			{ 0x2574, "AVer" }
 		};
 
-		readonly Dictionary<int, string> sonyModelMap = new Dictionary<int, string> {
+		readonly Dictionary<int, string> sonyModelMap = new() {
 			{ 0x400, "EVI-D30" },
 			{ 0x401, "EVI-D100" },
 			{ 0x403, "EVI-D70" },
@@ -82,15 +106,15 @@ namespace ViscaUI {
 			{ 0x507, "EVI-HD7" },
 			{ 0x514, "EVI-H100" }
 		};
-		readonly Dictionary<int, string> averModelMap = new Dictionary<int, string> {
+		readonly Dictionary<int, string> averModelMap = new() {
 			{ 0x559, "MD330" },
 			{ 0x565, "MD120" },
 			{ 0x500, "PTZ210" },
 			{ 0x510, "PTC500" }
 		};
 
-		uint NoWBManual = 0x01;
-		uint NoBrightDirect = 0x02;
+		readonly uint NoWBManual = 0x01;
+		readonly	uint NoBrightDirect = 0x02;
 
 		//readonly string[] IrisStrings = { " --", "F22", "F19", "F16", "F14", "F11", "F9.6", "F8.0", "F6.8", "F5.6", "F4.8",
 		//								 "F4.0", "F3.4", "F2.8", "F2.4", "F2.0", "F1.6", "F1.4", "F1.4", "F1.4", "F1.4",
@@ -120,14 +144,13 @@ namespace ViscaUI {
 		static int lastMsgNum = 0;
 
 		public bool keepReading = false;
-		readonly static Queue<byte> receiveQueue = new Queue<byte>();
+		readonly static Queue<byte> receiveQueue = new();
 
 		static int numDevices = 0;
 		static uint deviceId = 1;
 		static bool powerOn = false;
-		static Mode currentMode = Mode.D70;
-		static bool noWBManual = false;
-		static List<DeviceInfo> deviceInfos = new List<DeviceInfo>();
+	//static bool noWBManual = false;
+		static List<DeviceInfo> deviceInfos = new();
 
 		static byte panRate = 1;
 		static byte tiltRate = 1;
@@ -151,10 +174,10 @@ namespace ViscaUI {
 
 		#region UI Elements
 
-		List<Button> presetButtons = new();
-		List<TextBox> presetTexts = new();
-		List<Panel> presetPanels = new();
-		List<RadioButton> deviceButtons = new();
+		List<Button> presetButtons;
+		List<TextBox> presetTexts;
+		List<Panel> presetPanels;
+	  	List<RadioButton> deviceButtons;
 		List<TextBox> cameraTexts = new();
 		List<Button> ptzButtons = new();		 
 		List<Control> focusControls = new();
@@ -210,99 +233,6 @@ namespace ViscaUI {
 		//int SetPresetBtn = 1;
 		//int SelectPresetBtn = 3;
 		//int TriggerBtn = 7;
-
-		#region Simple Logger
-		public static class SimpleLogger {
-			static string appDataPath = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
-			private static string LogFilePath = Path.Combine(appDataPath, "Visca-01.log");
-			private static bool initialized = false;
-			private static bool logExists = false;
-			private static Queue<string> waitingMsg = new Queue<string>();
-
-			private static async void Init() {
-				try {
-					string logFolderPath = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
-					string[] logFiles = Directory.GetFiles(appDataPath, "Visca-*.log");
-
-					int logNo = 1;
-					DateTime oldestDate = DateTime.Now;
-
-					foreach (var file in logFiles) {
-						string fileName = Path.GetFileName(file);
-						int n = 0;
-						string nStr = fileName.Replace("Visca-", "").Replace(".log", "");
-						if (Int32.TryParse(nStr, out n)) {
-							DateTime created = File.GetCreationTime(file);
-							DateTime modified = File.GetLastWriteTime(file);
-							DateTime accessed = File.GetLastAccessTime(file);
-							if (created < oldestDate) {
-								oldestDate = created;
-								logNo = n;
-							}
-						}
-					}
-
-					if (logNo > 10) {
-						logNo = 1;
-					}
-
-					initialized = true;
-
-					int nextLog = logNo;
-					string fName = $"Visca-{nextLog:D2}.log";
-					string fPath = Path.Combine(appDataPath, fName);
-					Debug.WriteLine($"log path: {fPath}");
-					if (File.Exists(fPath)) {
-						File.Delete(fPath);
-					}
-
-					string logEntry = $"{DateTime.Now:MM-dd} - ViscaUI data log {Environment.NewLine}";
-					File.WriteAllText(fPath, logEntry);
-					if (File.Exists(fPath)) {
-						LogFilePath = fPath;
-						logExists = true;
-					}
-				} catch (System.IO.IOException exc) {
-					Debug.WriteLine($"Init() system IO exception: {exc}");
-				} catch (Exception exc) {
-					Debug.WriteLine($"Init() exception: {exc}");
-				}
-			}
-
-			public static async Task LogAsync(string message) {
-				if (!initialized) {
-					Init();
-				}
-
-				string logEntry = $"{DateTime.Now:MM-dd HH:mm:ss.fff} - {message}{Environment.NewLine}";
-
-				if (FileLocked()) {
-					waitingMsg.Enqueue(logEntry);
-				} else {
-					if (logExists) {
-						while (waitingMsg.Count > 0) {
-							string msg = waitingMsg.Dequeue();
-							await File.AppendAllTextAsync(LogFilePath, msg);
-						}
-
-						await File.AppendAllTextAsync(LogFilePath, logEntry);
-					}
-				}
-			}
-
-			private static bool FileLocked() {
-				try {
-					using (FileStream stream = new FileStream(LogFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) {
-						stream.Close();
-					}
-				} catch (IOException) {
-					return true;
-				}
-
-				return false;
-			}
-		}
-		#endregion
 
 		public void dfo(string txt) {
 			if (loggingOn) {
@@ -369,34 +299,10 @@ namespace ViscaUI {
 
 			dfo("start");
 
-			deviceButtons.Add(C1);
-			deviceButtons.Add(C2);
-			deviceButtons.Add(C3);
-			deviceButtons.Add(C4);
-			deviceButtons.Add(C5);
-			deviceButtons.Add(C6);
-			deviceButtons.Add(C7);
-
-			presetButtons.Add(p1Btn);
-			presetButtons.Add(p2Btn);
-			presetButtons.Add(p3Btn);
-			presetButtons.Add(p4Btn);
-			presetButtons.Add(p5Btn);
-			presetButtons.Add(p6Btn);
-
-			presetTexts.Add(p1TextBox);
-			presetTexts.Add(p2TextBox);
-			presetTexts.Add(p3TextBox);
-			presetTexts.Add(p4TextBox);
-			presetTexts.Add(p5TextBox);
-			presetTexts.Add(p6TextBox);
-
-			presetPanels.Add(p1Panel);
-			presetPanels.Add(p2Panel);
-			presetPanels.Add(p3Panel);
-			presetPanels.Add(p4Panel);
-			presetPanels.Add(p5Panel);
-			presetPanels.Add(p6Panel);
+			deviceButtons = new List<RadioButton> { C1, C2, C3, C4, C5, C6, C7 };
+			presetButtons = new List<Button> { p1Btn, p2Btn, p3Btn, p4Btn, p5Btn, p6Btn };
+			presetTexts = new List<TextBox> { p1TextBox, p2TextBox, p3TextBox, p4TextBox, p5TextBox, p6TextBox };
+			presetPanels = new List<Panel> { p1Panel, p2Panel, p3Panel, p4Panel, p5Panel, p6Panel };
 
 			foreach (Button b in  presetButtons) {
 				b.AddHandler( UIElement.PointerPressedEvent, new PointerEventHandler(PresetDown), handledEventsToo: true );
@@ -555,7 +461,7 @@ namespace ViscaUI {
 						typeByte = 0x06;
 					}
 					msgData.Add(typeByte);
-					msgData.Add((byte)CommandByte[(int)msg.cmdType]);
+					msgData.Add(cmdByteMap[msg.cmdType]);
 					break;
 				case MessageType.MSG_Inquiry:
 					msgData.Add(getAddressByte());
@@ -566,7 +472,7 @@ namespace ViscaUI {
 						typeByte = 0x06;
 					}
 					msgData.Add(typeByte);
-					msgData.Add((byte)CommandByte[(int)msg.cmdType]);
+					msgData.Add(cmdByteMap[msg.cmdType]);
 					break;
 				default:
 					dfo("Unknown message type: " + msg.msgType.ToString());
@@ -818,9 +724,9 @@ namespace ViscaUI {
 										bal = BalanceType.Outdoor;
 										break;
 									case 5:
-										if (currentMode == Mode.D70) {
+										//if (currentMode == Mode.D70) {
 											bal = BalanceType.Manual;
-										}
+										//}
 										break;
 								}
 								rtn = "Balance Mode: " + bal.ToString();
