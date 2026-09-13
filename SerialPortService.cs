@@ -3,7 +3,7 @@ using System.IO;
 using System.IO.Ports;
 
 namespace ViscaUI {
-	public sealed class SerialPortService : IDisposable
+	public sealed partial class SerialPortService : IDisposable
 	{
 		private SerialPort? _port;
 		private readonly object _lock = new();

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 
 namespace ViscaUI
 {
@@ -24,7 +22,7 @@ namespace ViscaUI
 		public MessageType msgType = MessageType.MSG_Command;
 		public CommandType cmdType = CommandType.None;
 		public byte address = 1;
-		public byte[] data = new byte[0];
+		public byte[] data = [];
 		public string comment = "";
 		public int msgNum = 0;
 		public VMessage() { }
@@ -37,34 +35,26 @@ namespace ViscaUI
 		}
 	}
 
-	struct DeviceInfo {
-		public byte address;
-		public string name;
-		public string vendor;
-		public string model;
-		public string version;
-		public uint restrict;
-		public DeviceInfo(byte address, string name, string vendor, string model, string version, uint restrict = 0) {
-			this.address = address;
-			this.name = name;
-			this.vendor = vendor;
-			this.model = model;
-			this.version = version;
-			this.restrict = restrict;
-		}
+	struct DeviceInfo(byte address, string name, string vendor, string model, string version, uint restrict = 0) {
+		public byte address = address;
+		public string name = name;
+		public string vendor = vendor;
+		public string model = model;
+		public string version = version;
+		public uint restrict = restrict;
 	}
 
 	class MsgQueue
 	{
-		List<VMessage> list = new();
+		readonly List<VMessage> list = [];
 
-		private string dataToString(VMessage msg) {
-			string msgStr = "";
-			foreach (byte b in msg.data) {
-				msgStr += b.ToString("X2");
-			}
-			return msgStr;
-		}
+		//private string DataToString(VMessage msg) {
+		//	string msgStr = "";
+		//	foreach (byte b in msg.data) {
+		//		msgStr += b.ToString("X2");
+		//	}
+		//	return msgStr;
+		//}
 
 		public void Enqueue(VMessage msg) {
 			lock (this) {
@@ -100,7 +90,7 @@ namespace ViscaUI
 		}
 
 		public int Count {
-			get { return list.Count(); }
+			get { return list.Count; }
 		}
 	}
 }

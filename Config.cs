@@ -1,10 +1,7 @@
-﻿using System.ComponentModel.Design;
-using System.Drawing;
-using System.Text.Json;
+﻿using System.Drawing;
 using Windows.Storage;
 
 namespace ViscaUI {
-	//enum Mode { D70, D30 };
 
 	class Config {
 		const string PortStr = "Port";
@@ -14,9 +11,9 @@ namespace ViscaUI {
 		const string DebugStr = "Debug";
 		const string MiniStr = "Mini";
 		const string LogStr = "Log";
-		readonly static string[] CameraStrs = new[] { "Camera0", "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6" };
-		readonly static string[] PresetStrs = new[] { "Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5" };
-		readonly static string[] PresetAry = new[] { "PresetCam1", "PresetCam2", "PresetCam3", "PresetCam4", "PresetCam5", "PresetCam6", "PresetCam7" };
+		readonly static string[] CameraStrs = [ "Camera0", "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6" ];
+		//readonly static string[] PresetStrs = [ "Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5" ];
+		readonly static string[] PresetAry = [ "PresetCam1", "PresetCam2", "PresetCam3", "PresetCam4", "PresetCam5", "PresetCam6", "PresetCam7" ];
 		const string CalibratedStr = "Calibrated";
 		const string CalibrationXMinStr = "CalibrationXMin";
 		const string CalibrationXMaxStr = "CalibrationXMax";
@@ -46,10 +43,11 @@ namespace ViscaUI {
 		}
 
 		static string[] GetArray(string keyStr) {
-			string[] result = new[] { "", "", "", "", "", "" };
-			var localSettings = ApplicationData.Current.LocalSettings;
-			if (localSettings.Values.TryGetValue(keyStr, out object storedValue) && storedValue is string jsonString) {
-				result = JsonSerializer.Deserialize<string[]>(jsonString);
+			string[] result = [ "", "", "", "", "", "" ];
+			string value = GetString(keyStr, "");
+			string[] valueAry = value.Split('|');
+			for (int i = 0; i < valueAry.Length && i < result.Length; i++) {
+				result[i] = valueAry[i];
 			}
 			return result;
 		}
@@ -73,9 +71,8 @@ namespace ViscaUI {
 		}
 
 		static void SetArray(string keyStr, string[] value) {
-			var localSettings = ApplicationData.Current.LocalSettings;
-			string jsonString = JsonSerializer.Serialize(value);
-			localSettings.Values[keyStr] = jsonString;
+			string result = string.Join('|', value);
+			SetString(keyStr, result);
 		}
 
 		static public string Port
@@ -169,25 +166,25 @@ namespace ViscaUI {
 			}
 		}
 
-		static public string GetPreset(uint n) {
-			if (n < 6) {
-				return GetString(PresetStrs[n], "");
-			} else {
-				return "";
-			}
-		}
+		//static public string GetPreset(uint n) {
+		//	if (n < 6) {
+		//		return GetString(PresetStrs[n], "");
+		//	} else {
+		//		return "";
+		//	}
+		//}
 
-		static public void SetPreset(uint n, string str) {
-			if (n < 6) {
-				SetString(PresetStrs[n], str);
-			}
-		}
+		//static public void SetPreset(uint n, string str) {
+		//	if (n < 6) {
+		//		SetString(PresetStrs[n], str);
+		//	}
+		//}
 
 		static public string[] GetPresets(uint n) {
 			if (n < 7) {
 				return GetArray(PresetAry[n]);
 			} else {
-				return new[] { "", "", "", "", "", "" };
+				return [ "", "", "", "", "", "" ];
 			}
 		}
 

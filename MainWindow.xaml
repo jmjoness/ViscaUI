@@ -74,7 +74,7 @@
 								<RelativePanel x:Name="ptRect" HorizontalAlignment="Left" Height="120" Width="140"
 													Margin="5,5,0,0" BorderThickness="2" BorderBrush="White" 
 													Grid.Column="1" VerticalAlignment="Top"  
-													PointerPressed="ptRect_MouseDown" PointerReleased="ptRect_MouseUp" PointerMoved="ptRect_MouseMove" >
+													PointerPressed="PtRect_MouseDown" PointerReleased="PtRect_MouseUp" PointerMoved="PtRect_MouseMove" >
 									<Image x:Name="ptSvg"
 												Source="ms-appx:///Assets/ptpanel2.svg"
 												Stretch="UniformToFill"
@@ -90,7 +90,7 @@
 							<RelativePanel x:Name="zmRect" HorizontalAlignment="Center" Height="120" Width="60" 
 												Margin="0,5,0,0" BorderThickness="2" BorderBrush="White" 
 												VerticalAlignment="Top" 
-												PointerPressed="zmRect_MouseDown" PointerReleased="zmRect_MouseUp" PointerMoved="zmRect_MouseMove" >
+												PointerPressed="ZoomRect_MouseDown" PointerReleased="ZoomRect_MouseUp" PointerMoved="ZoomRect_MouseMove" >
 								<Image x:Name="zmSvg"
 											Source="ms-appx:///Assets/zpanel2.svg"
 											Stretch="UniformToFill"
@@ -114,7 +114,7 @@
 								</CheckBox>
 								<RelativePanel x:Name="focusRect" HorizontalAlignment="Center" Height="90" Width="60" 
 													Margin="0,2,0,0" BorderThickness="2" BorderBrush="White" VerticalAlignment="Top" 
-													PointerPressed="focusRect_MouseDown" PointerReleased="focusRect_MouseUp" PointerMoved="focusRect_MouseMove" >
+													PointerPressed="FocusRect_MouseDown" PointerReleased="FocusRect_MouseUp" PointerMoved="FocusRect_MouseMove" >
 									<Image x:Name="focSvg"
 											Source="ms-appx:///Assets/focpanel2.svg"
 											Stretch="UniformToFill"

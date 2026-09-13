@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace ViscaUI {
 	public static class SimpleLogger {
-		static string appDataPath = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
+		private readonly static string appDataPath = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
 		private static string LogFilePath = Path.Combine(appDataPath, "Visca-01.log");
 		private static bool initialized = false;
 		private static bool logExists = false;
-		private static Queue<string> waitingMsg = new Queue<string>();
+		private static readonly Queue<string> waitingMsg = new();
 
 		private static async void Init() {
 			try {
@@ -22,9 +22,8 @@ namespace ViscaUI {
 
 				foreach (var file in logFiles) {
 					string fileName = Path.GetFileName(file);
-					int n = 0;
 					string nStr = fileName.Replace("Visca-", "").Replace(".log", "");
-					if (Int32.TryParse(nStr, out n)) {
+					if (Int32.TryParse(nStr, out int n)) {
 						DateTime created = File.GetCreationTime(file);
 						DateTime modified = File.GetLastWriteTime(file);
 						DateTime accessed = File.GetLastAccessTime(file);
@@ -85,9 +84,8 @@ namespace ViscaUI {
 
 		private static bool FileLocked() {
 			try {
-				using (FileStream stream = new FileStream(LogFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) {
-					stream.Close();
-				}
+				using FileStream stream = new(LogFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+				stream.Close();
 			} catch (IOException) {
 				return true;
 			}
