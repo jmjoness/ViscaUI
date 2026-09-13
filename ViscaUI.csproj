@@ -12,7 +12,7 @@
     <WinUISDKReferences>false</WinUISDKReferences>
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
-	  <VersionPrefix>1.0.8</VersionPrefix>
+	  <VersionPrefix>1.1.0</VersionPrefix>
 	<ApplicationIcon>camera.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
@@ -73,8 +73,8 @@
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
     <PackageCertificateThumbprint>8140E85CED8CBBA0AE7AD31B592528E9E7561302</PackageCertificateThumbprint>
     <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
-    <AssemblyVersion>1.0.8.0</AssemblyVersion>
-    <FileVersion>1.0.8.0</FileVersion>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
     <DebugType>full</DebugType>
