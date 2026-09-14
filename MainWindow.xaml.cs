@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using Windows.Foundation;
 using WinRT.Interop;
 
@@ -27,7 +28,7 @@ namespace ViscaUI {
 		static BalanceType balanceType = BalanceType.Auto;
 
 		readonly static Dictionary<BalanceType, string> balanceStrMap = new() {
-	  			{ BalanceType.Auto, "Auto" },
+			{ BalanceType.Auto, "Auto" },
 			{ BalanceType.Indoor, "Indoor" },
 			{ BalanceType.Outdoor, "Outdoor" },
 			{ BalanceType.OnePush, "One Push" },
@@ -108,7 +109,8 @@ namespace ViscaUI {
 			{ 0x559, "MD330" },
 			{ 0x565, "MD120" },
 			{ 0x500, "PTZ210" },
-			{ 0x510, "PTC500" }
+			{ 0x510, "PTC500" },
+			{ 0x505A, "CAM520" }
 		};
 
 		readonly uint NoWBManual = 0x01;
@@ -164,6 +166,8 @@ namespace ViscaUI {
 		static bool loggingOn = false;
 		static bool debugOn = false;
 		static bool loaded = false;
+		static bool inBalanceSetup = false;
+		static bool inDisplayBright = false;
 
 		Microsoft.UI.Windowing.AppWindow? appWindow = null;
 
@@ -176,7 +180,6 @@ namespace ViscaUI {
 		public List<Panel> presetPanels = [];
 		public List<RadioButton> deviceButtons = [];
 		public List<TextBox> cameraTexts = [];
-		public List<Button> ptzButtons = [];
 		public List<Control> focusControls = [];
 		public List<Control> exposureControls = [];
 
@@ -263,11 +266,11 @@ namespace ViscaUI {
 			ShowConnectedState(result == "");
 			if (result == "") {
 				ShowConnectedState(true);
-				ResponseListAdd("Connected");
+				DFO("Connected");
 				BroadcastAddress();
 			} else {
 				ShowConnectedState(false);
-				ResponseListAdd(result);
+				DFO(result);
 			}
 
 			SetControlsState();
@@ -318,21 +321,13 @@ namespace ViscaUI {
 
 		private void SetControlsState() {
 			this.DispatcherQueue.TryEnqueue(() => {
-			bool enable = false;
-			if ((_service != null) && _service.IsConnected) {
-				enable = true;
-				//ShowPowerState(true);
-			} else {
-				enable = false;
-				//ShowPowerState(false);
-			}
-
-			if (ptzButtons is null) {
-				DFO("ptzButtons is null");
-				return;
-			} 
-				foreach (Button b in ptzButtons) {
-					b.IsEnabled = enable;
+				bool enable = false;
+				if ((_service != null) && _service.IsConnected) {
+					enable = true;
+					//ShowPowerState(true);
+				} else {
+					enable = false;
+					//ShowPowerState(false);
 				}
 
 				foreach (Button b in presetButtons) {
@@ -375,19 +370,19 @@ namespace ViscaUI {
 		}
 
 		private void ConnectClick(object sender, RoutedEventArgs e) {
-			ResponseListAdd("ConnectClick()");
+			DFO("ConnectClick()");
 			if (_service.IsConnected) {
-				ResponseListAdd("disconnect");
+				DFO("disconnect");
 				_service.Disconnect();
 				ShowConnectedState(false);
 			} else {
 				try {
-					ResponseListAdd("connect");
+					DFO("connect");
 					_service.Connect();
 					ShowConnectedState(true);
 					BroadcastAddress();
 				} catch (Exception exc) {
-					ResponseListAdd("Exception connecting: " + exc.Message);
+					DFO("Exception connecting: " + exc.Message);
 				}
 			}
 
@@ -453,7 +448,9 @@ namespace ViscaUI {
 				case MessageType.MSG_Command:
 					msgData.Add(GetAddressByte());
 					msgData.Add(0x01);
-					if ((msg.cmdType == CommandType.CMD_PanTilt) || (msg.cmdType == CommandType.CMD_PanTiltRel)) {
+					if ((msg.cmdType == CommandType.CMD_PanTilt) 
+							|| (msg.cmdType == CommandType.CMD_PanTiltRel) 
+							|| (msg.cmdType == CommandType.CMD_PanTiltHome)) {
 						typeByte = 0x06;
 					}
 					msgData.Add(typeByte);
@@ -500,9 +497,6 @@ namespace ViscaUI {
 			SendMsg(msg);
 		}
 
-		private  void SendDeviceTypeInquirySendInquiry() {
-			SendInquiry(CommandType.INQ_DeviceType, "Device Type Inquiry");
-		}
 		private  void BroadcastAddress() {
 			VMessage msg = new (MessageType.MSG_Broadcast, CommandType.BDC_AddressSet, 0x88, [ 0x30, 0x01 ]);
 			SendMsg(msg);
@@ -559,17 +553,17 @@ namespace ViscaUI {
 			lastCmdType = CommandType.None;
 			ShowConnectedState(false);
 			SetControlsState();
-			ShowMessage("Port closed - no response from " + lastCmdType.ToString());
+			DFO("Port closed - no response from " + lastCmdType.ToString());
 		}
 
 		private async void ShowMessage(string msg) {
 			if (messageDialogShowing) {
-				ResponseListAdd("message dialog already showing");
+				DFO("message dialog already showing");
 				return;
 			}
 		
 			messageDialogShowing = true;
-			ResponseListAdd("Show: " + msg);
+			DFO("Show: " + msg);
 			try {
 				this.DispatcherQueue.TryEnqueue(() => {
 					ContentDialog dialog = new() {
@@ -583,22 +577,22 @@ namespace ViscaUI {
 					_ = dialog.ShowAsync();
 				});
 			} catch (Exception exc) {
-				ResponseListAdd($"show message exception: {exc}");
+				DFO($"show message exception: {exc}");
 			}
 		}
 
 		private void ContentDialog_Closed(ContentDialog sender, ContentDialogClosedEventArgs args) {
-			ResponseListAdd("Dialog closed");
+			DFO("Dialog closed");
 			messageDialogShowing = false;
 		}
 
 		private  void Service_ErrorOccurred(object? sender, string message) {
-			ResponseListAdd("Service error occurred");
+			DFO("Service error occurred");
 			ShowMessage("Service error occurred");
 		}
 
 		private  async void Service_ConnectionLost(object? sender, EventArgs e) {
-			ResponseListAdd("Connection Lost");
+			DFO("Connection Lost");
 			ShowMessage("Connection Lost");
 		}
 
@@ -611,7 +605,7 @@ namespace ViscaUI {
 			} else if ((response[1] & 0xF0) == 0x40) {
 				//rtn = $"ACK: Device {dev}";
 			} else if ((response[1] & 0xF0) == 0x50) {
-				//rtn = $"FIN: Device {dev}";
+				rtn = $"FIN: Device {dev}";
 				lastCmdType = CommandType.None;
 			}
 
@@ -624,6 +618,7 @@ namespace ViscaUI {
 				if ((response[0] == 0x88) && (response[1] == 0x30)) {
 					rtn = "Address Set Return";
 					numDevices = (int)(response[2]) - 1;
+					if (numDevices == 0) numDevices = 1;		// handle adverse case where return is same as sent message
 					lastCmdType = CommandType.None;
 					ShowValidCameras();
 					SendInquiry(CommandType.INQ_DeviceType);
@@ -681,10 +676,10 @@ namespace ViscaUI {
 								break;
 							case CommandType.INQ_AEMode:
 								if (response[2] == 0x00) {
-									SetBrightType(false);
+									DisplayBrightMode(false);
 									rtn = "Exposure Auto ";
 								} else if (response[2] == 0x0D) {
-									SetBrightType(true);
+									DisplayBrightMode(true);
 									rtn = "Exposure Bright";
 								}
 								lastCmdType = CommandType.None;
@@ -712,7 +707,7 @@ namespace ViscaUI {
 										bal = BalanceType.Outdoor;
 										break;
 									case 5:
-										//if (currentMode == Mode.D70) {
+										//if ((deviceInfos is not null) && ((deviceInfos[(int)deviceId - 1].restrict & NoWBManual) == 0)) {
 											bal = BalanceType.Manual;
 										//}
 										break;
@@ -859,7 +854,6 @@ namespace ViscaUI {
 		private  void ResponseListAdd(string text) {
 			this.DispatcherQueue.TryEnqueue(() => {
 				responseListBox.Items.Insert(0, text);
-				//DFO(text);
 			});
 		}
 		#endregion
@@ -1219,7 +1213,7 @@ namespace ViscaUI {
 			lastPresetNumber = (lpStr is not null) ? int.Parse(lpStr) - 1 : 0;
 			settingPreset = false;
 			presetTimer = new System.Timers.Timer(1000) { Enabled = true };
-presetTimer.Elapsed += PresetTimer_Tick;
+			presetTimer.Elapsed += PresetTimer_Tick;
 		}
 
 		private void PresetUp(object sender, PointerRoutedEventArgs e) {
@@ -1296,6 +1290,7 @@ presetTimer.Elapsed += PresetTimer_Tick;
 		}
 
 		private void DisplayBrightMode(bool manual) {
+			inDisplayBright = true;
 			this.DispatcherQueue.TryEnqueue(() => {
 				expBrightChk.IsChecked = manual;
 				expSlider.IsEnabled = manual;
@@ -1303,6 +1298,7 @@ presetTimer.Elapsed += PresetTimer_Tick;
 				//darkBtn.Enabled = manual;
 				expBacklitChk.IsEnabled = !manual;
 			});
+			inDisplayBright = false;
 		}
 
 		private void ShowExposure(int pos) {
@@ -1319,6 +1315,8 @@ presetTimer.Elapsed += PresetTimer_Tick;
 		}
 
 		private void SetBrightType(bool manual) {
+			if (inDisplayBright) return;
+
 			DisplayBrightMode(manual);
 
 			if (manual) {
@@ -1406,6 +1404,7 @@ presetTimer.Elapsed += PresetTimer_Tick;
 
 		#region White Balance
 		private void BalanceSetup() {
+			inBalanceSetup = true;
 			wbSelectCombo.Items.Clear();
 			wbSelectCombo.Items.Add(balanceStrMap[BalanceType.Auto]);
 			wbSelectCombo.Items.Add(balanceStrMap[BalanceType.Indoor]);
@@ -1418,7 +1417,10 @@ presetTimer.Elapsed += PresetTimer_Tick;
 				}
 
 				wbSelectCombo.SelectedIndex = 0;
+				wbRedSlider.IsEnabled = false;
+				wbBlueSlider.IsEnabled = false;
 			}
+			inBalanceSetup = false;
 		}
 
 		private void SetBalanceType(BalanceType balance) {
@@ -1468,7 +1470,7 @@ presetTimer.Elapsed += PresetTimer_Tick;
 		}
 
 		private void BalSelectChanged(object sender, SelectionChangedEventArgs e) {
-			if (loaded && powerOn) {
+			if (loaded && powerOn && !inBalanceSetup) {
 				BalanceType typ = BalanceType.Auto;
 				string? bal = wbSelectCombo.SelectedItem as string;
 				foreach (KeyValuePair<BalanceType, string> kvp in balanceStrMap) {

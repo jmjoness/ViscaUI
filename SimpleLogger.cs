@@ -18,7 +18,7 @@ namespace ViscaUI {
 				string[] logFiles = Directory.GetFiles(appDataPath, "Visca-*.log");
 
 				int logNo = 1;
-				DateTime oldestDate = DateTime.Now;
+				DateTime newestDate = new(2000, 1, 1);
 
 				foreach (var file in logFiles) {
 					string fileName = Path.GetFileName(file);
@@ -27,9 +27,9 @@ namespace ViscaUI {
 						DateTime created = File.GetCreationTime(file);
 						DateTime modified = File.GetLastWriteTime(file);
 						DateTime accessed = File.GetLastAccessTime(file);
-						if (created < oldestDate) {
-							oldestDate = created;
-							logNo = n;
+						if (created > newestDate) {
+							newestDate = created;
+							logNo = n + 1;
 						}
 					}
 				}
@@ -48,6 +48,7 @@ namespace ViscaUI {
 					File.Delete(fPath);
 				}
 
+				Debug.WriteLine($"--- Creating log file: {fPath}");
 				string logEntry = $"{DateTime.Now:MM-dd} - ViscaUI data log {Environment.NewLine}";
 				File.WriteAllText(fPath, logEntry);
 				if (File.Exists(fPath)) {
