@@ -893,7 +893,7 @@ namespace ViscaUI {
 
 		private void PtRect_MouseDown(object _1, PointerRoutedEventArgs e) {
 			Debug.WriteLine("mouse down");
-			panTiltTimer = new System.Timers.Timer(100) { Enabled = true };
+			panTiltTimer = new System.Timers.Timer(300) { Enabled = true };
 			panTiltTimer.Elapsed += PanTiltTimer_Tick;
 			ptStartPoint = e.GetCurrentPoint(ptRect);
 			Debug.WriteLine("mouse down end");
@@ -918,7 +918,7 @@ namespace ViscaUI {
 					lr = ((x < 0) ? -1 : 1);
 				}
 				if (tiltRate != 0) {
-					ud = ((y < 0) ? -1 : 1);
+					ud = ((y > 0) ? -1 : 1);
 				}
 				if ((lr != 0) || (ud != 0)) {
 					PanTiltMove(lr, ud);
@@ -1016,7 +1016,7 @@ namespace ViscaUI {
 		}
 		#endregion
 
-		#region Zooom
+		#region Zoom
 		private void ZoomStop() {
 			byte[] d = [ 0x00 ];
 			SendCommand(CommandType.CMD_Zoom, d, "stop");
@@ -1101,7 +1101,7 @@ namespace ViscaUI {
 		private void SetFocusType(bool manual) {
 			focusRect.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
 			if (lastCmdType == CommandType.None) {
-				byte[] d = [ 0x38, (byte)(manual ? 0x03 : 0x02) ];
+				byte[] d = [ (byte)(manual ? 0x03 : 0x02) ];
 				SendCommand(CommandType.CMD_FocusMode, d, $"{(manual ? "manual" : "auto")}");
 			}
 		}
@@ -1285,14 +1285,14 @@ namespace ViscaUI {
 		#endregion
 
 		#region Exposure
-		private void ExpBrightClick(object sender, RoutedEventArgs e) {
-			SetBrightType(expBrightChk.IsChecked == true);
+		private void ExpManualClick(object _1, RoutedEventArgs _2) {
+			SetBrightType(expManualChk.IsChecked == true);
 		}
 
 		private void DisplayBrightMode(bool manual) {
 			inDisplayBright = true;
 			this.DispatcherQueue.TryEnqueue(() => {
-				expBrightChk.IsChecked = manual;
+				expManualChk.IsChecked = manual;
 				expSlider.IsEnabled = manual;
 				//brightBtn.Enabled = manual;
 				//darkBtn.Enabled = manual;

@@ -12,7 +12,7 @@
   <Identity
     Name="AutonomousSystems.ViscaUI"
     Publisher="CN=D0E63A3E-6D5F-4D75-8CAD-7FF4BADFA1DF"
-    Version="1.1.1.0" />
+    Version="1.1.3.0" />
 
   <mp:PhoneIdentity PhoneProductId="982e57ce-8cc2-45dc-aba8-4ecca0a09cef" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
