@@ -194,55 +194,34 @@
 				<StackPanel Grid.Column="1" Grid.Row="0" BorderThickness="2" BorderBrush="Azure">
 					<TextBlock Text="Camera" Foreground="Azure" TextAlignment="Center" Height="18" />
 					<StackPanel Spacing="0">
-						<RadioButton x:Name="C1" Content="1" GroupName="CameraGroup" Checked="CameraChecked" Foreground="Azure" Padding="4" HorizontalAlignment="Left" Margin="4,1" >
-							<RadioButton.ContentTemplate>
-								<DataTemplate>	
-									<TextBlock Text ="1" Foreground="Azure" /> 	
-								</DataTemplate> 
-							</RadioButton.ContentTemplate>
-						</RadioButton>
-						<RadioButton x:Name="C2" Content="2" GroupName="CameraGroup" Checked="CameraChecked" Foreground="Azure" Padding="4" HorizontalAlignment="Left" Margin="4,1" >
-							<RadioButton.ContentTemplate>
-								<DataTemplate>
-									<TextBlock Text ="1" Foreground="Azure" />
-								</DataTemplate>
-							</RadioButton.ContentTemplate>
-						</RadioButton>
-						<RadioButton x:Name="C3" Content="3" GroupName="CameraGroup" Checked="CameraChecked" Foreground="Azure" Padding="4" HorizontalAlignment="Left" Margin="4,1" >
-							<RadioButton.ContentTemplate>
-								<DataTemplate>
-									<TextBlock Text ="1" Foreground="Azure" />
-								</DataTemplate>
-							</RadioButton.ContentTemplate>
-						</RadioButton>
-						<RadioButton x:Name="C4" Content="4" GroupName="CameraGroup" Checked="CameraChecked" Foreground="Azure" Padding="4" HorizontalAlignment="Left" Margin="4,1" >
-							<RadioButton.ContentTemplate>
-								<DataTemplate>
-									<TextBlock Text ="1" Foreground="Azure" />
-								</DataTemplate>
-							</RadioButton.ContentTemplate>
-						</RadioButton>
-						<RadioButton x:Name="C5" Content="5" GroupName="CameraGroup" Checked="CameraChecked" Foreground="Azure" Padding="4" HorizontalAlignment="Left" Margin="4,1" >
-							<RadioButton.ContentTemplate>
-								<DataTemplate>
-									<TextBlock Text ="1" Foreground="Azure" />
-								</DataTemplate>
-							</RadioButton.ContentTemplate>
-						</RadioButton>
-						<RadioButton x:Name="C6" Content="6" GroupName="CameraGroup" Checked="CameraChecked" Foreground="Azure" Padding="4" HorizontalAlignment="Left" Margin="4,1" >
-							<RadioButton.ContentTemplate>
-								<DataTemplate>
-									<TextBlock Text ="1" Foreground="Azure" />
-								</DataTemplate>
-							</RadioButton.ContentTemplate>
-						</RadioButton>
-						<RadioButton x:Name="C7" Content="7" GroupName="CameraGroup" Checked="CameraChecked" Foreground="Azure" Padding="4" HorizontalAlignment="Left" Margin="4,1" >
-							<RadioButton.ContentTemplate>
-								<DataTemplate>
-									<TextBlock Text ="1" Foreground="Azure" />
-								</DataTemplate>
-							</RadioButton.ContentTemplate>
-						</RadioButton>
+						<StackPanel x:Name="CP1" Orientation="Horizontal">
+							<RadioButton x:Name="C1" Content="1" GroupName="CameraGroup" MinWidth="20" Width="20" Checked="CameraChecked" Padding="4,4,0,0" Margin="4,1,0,0" />
+							<TextBox x:Name="CT1" MinWidth="50" Width="50" Padding="4,6" LostFocus="CameraTextChanged" />
+						</StackPanel>
+						<StackPanel x:Name="CP2" Orientation="Horizontal">
+							<RadioButton x:Name="C2" Content="2" GroupName="CameraGroup" MinWidth="20" Width="20" Checked="CameraChecked" Padding="4,4,0,0" Margin="4,1,0,0" />
+							<TextBox x:Name="CT2" MinWidth="50" Width="50" Padding="4,6" LostFocus="CameraTextChanged" />
+						</StackPanel>
+						<StackPanel x:Name="CP3" Orientation="Horizontal">
+							<RadioButton x:Name="C3" Content="3" GroupName="CameraGroup" MinWidth="20" Width="20" Checked="CameraChecked" Padding="4,4,0,0" Margin="4,1,0,0" />
+							<TextBox x:Name="CT3" MinWidth="50" Width="50" Padding="4,6" LostFocus="CameraTextChanged" />
+						</StackPanel>
+						<StackPanel x:Name="CP4" Orientation="Horizontal">
+							<RadioButton x:Name="C4" Content="4" GroupName="CameraGroup" MinWidth="20" Width="20" Checked="CameraChecked" Padding="4,4,0,0" Margin="4,1,0,0" />
+							<TextBox x:Name="CT4" MinWidth="50" Width="50" Padding="4,6" LostFocus="CameraTextChanged" />
+						</StackPanel>
+						<StackPanel x:Name="CP5" Orientation="Horizontal">
+							<RadioButton x:Name="C5" Content="5" GroupName="CameraGroup" MinWidth="20" Width="20" Checked="CameraChecked" Padding="4,4,0,0" Margin="4,1,0,0" />
+							<TextBox x:Name="CT5" MinWidth="50" Width="50" Padding="4,6" LostFocus="CameraTextChanged" />
+						</StackPanel>
+						<StackPanel x:Name="CP6" Orientation="Horizontal">
+							<RadioButton x:Name="C6" Content="6" GroupName="CameraGroup" MinWidth="20" Width="20" Checked="CameraChecked" Padding="4,4,0,0" Margin="4,1,0,0" />
+							<TextBox x:Name="CT6" MinWidth="50" Width="50" Padding="4,6" LostFocus="CameraTextChanged" />
+						</StackPanel>
+						<StackPanel x:Name="CP7" Orientation="Horizontal">
+							<RadioButton x:Name="C7" Content="7" GroupName="CameraGroup" MinWidth="20" Width="20" Checked="CameraChecked" Padding="4,4,0,0" Margin="4,1,0,0" />
+							<TextBox x:Name="CT7" MinWidth="50" Width="50" Padding="4,6" LostFocus="CameraTextChanged" />
+						</StackPanel>
 					</StackPanel>
 				</StackPanel>
 			</Grid>

@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using Windows.Foundation;
 using WinRT.Interop;
@@ -178,16 +179,15 @@ namespace ViscaUI {
 		public List<Button> presetButtons = [];
 		public List<TextBox> presetTexts = [];
 		public List<Panel> presetPanels = [];
-		public List<RadioButton> deviceButtons = [];
+		public List<Panel> cameraPanels = [];
 		public List<TextBox> cameraTexts = [];
-		public List<Control> focusControls = [];
-		public List<Control> exposureControls = [];
+		//public List<Control> focusControls = [];
+		//public List<Control> exposureControls = [];
 
 		#endregion
 
 		#region Constants
 		const int addressBase = 0x80;
-		const byte camByte2 = 0x01;
 		const byte normCmd = 0x04;
 		const byte panTiltCmd = 0x06;
 
@@ -299,10 +299,11 @@ namespace ViscaUI {
 
 			DFO("start");
 
-			deviceButtons = [C1, C2, C3, C4, C5, C6, C7];
 			presetButtons = [p1Btn, p2Btn, p3Btn, p4Btn, p5Btn, p6Btn];
 			presetTexts = [p1TextBox, p2TextBox, p3TextBox, p4TextBox, p5TextBox, p6TextBox];
 			presetPanels = [p1Panel, p2Panel, p3Panel, p4Panel, p5Panel, p6Panel];
+			cameraPanels = [CP1, CP2, CP3, CP4, CP5, CP6, CP7];
+			cameraTexts = [CT1, CT2, CT3, CT4, CT5, CT6, CT7];
 
 			foreach (Button b in  presetButtons) {
 				b.AddHandler( UIElement.PointerPressedEvent, new PointerEventHandler(PresetDown), handledEventsToo: true );
@@ -451,7 +452,7 @@ namespace ViscaUI {
 					if ((msg.cmdType == CommandType.CMD_PanTilt) 
 							|| (msg.cmdType == CommandType.CMD_PanTiltRel) 
 							|| (msg.cmdType == CommandType.CMD_PanTiltHome)) {
-						typeByte = 0x06;
+						typeByte = panTiltCmd;
 					}
 					msgData.Add(typeByte);
 					msgData.Add(cmdByteMap[msg.cmdType]);
@@ -462,7 +463,7 @@ namespace ViscaUI {
 					if (msg.cmdType == CommandType.INQ_DeviceType) {
 						typeByte = 0x00;
 					} else if (msg.cmdType == CommandType.INQ_PanTiltPos) {
-						typeByte = 0x06;
+						typeByte = panTiltCmd;
 					}
 					msgData.Add(typeByte);
 					msgData.Add(cmdByteMap[msg.cmdType]);
@@ -1200,9 +1201,26 @@ namespace ViscaUI {
 		private void ShowValidCameras() {
 			this.DispatcherQueue.TryEnqueue(() => {
 				for (int i = 0; i < 7; i++) {
-					deviceButtons[i].Visibility = (i < numDevices ? Visibility.Visible : Visibility.Collapsed);
+					if (i < numDevices) {
+						cameraPanels[i].Visibility = Visibility.Visible;
+						string text = Config.GetCamera((uint)i);
+						cameraTexts[i].Text = text;
+					} else {
+						cameraPanels[i].Visibility = Visibility.Collapsed;
+					}
 				}
 			});
+		}
+
+		private void CameraTextChanged(object sender, RoutedEventArgs e) {
+			TextBox? textBox = sender as TextBox;
+			if (textBox is not null) {
+				string name = textBox.Name.ToString();
+				name = name.Replace("CT", "");
+				int cameraNumber = (name is not null) ? int.Parse(name) : 0;
+				Debug.WriteLine($"Camera number: {cameraNumber}");
+				Config.SetCamera((uint)cameraNumber - 1, textBox.Text);
+			}
 		}
 		#endregion
 

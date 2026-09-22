@@ -11,7 +11,7 @@ namespace ViscaUI {
 		const string DebugStr = "Debug";
 		const string MiniStr = "Mini";
 		const string LogStr = "Log";
-		readonly static string[] CameraStrs = [ "Camera0", "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6" ];
+		readonly static string[] CameraStrs = [ "Camera1", "Camera2", "Camera3", "Camera4", "Camera5", "Camera6", "Camera7",];
 		//readonly static string[] PresetStrs = [ "Preset0", "Preset1", "Preset2", "Preset3", "Preset4", "Preset5" ];
 		readonly static string[] PresetAry = [ "PresetCam1", "PresetCam2", "PresetCam3", "PresetCam4", "PresetCam5", "PresetCam6", "PresetCam7" ];
 		const string CalibratedStr = "Calibrated";
