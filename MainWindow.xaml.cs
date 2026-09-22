@@ -1212,7 +1212,7 @@ namespace ViscaUI {
 			});
 		}
 
-		private void CameraTextChanged(object sender, RoutedEventArgs e) {
+		private void CameraTextChanged(object sender, RoutedEventArgs _1) {
 			TextBox? textBox = sender as TextBox;
 			if (textBox is not null) {
 				string name = textBox.Name.ToString();
