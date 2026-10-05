@@ -730,7 +730,9 @@ namespace ViscaUI {
 								rtn = "Exp Comp: " + (on ? "On" : "Off");
 								DisplayExpComp(on);
 								lastCmdType = CommandType.None;
-								SendInquiry(CommandType.INQ_ExpCompPos);
+								if (on) {
+									SendInquiry(CommandType.INQ_ExpCompPos);
+								}
 								break;
 							}
 						}
