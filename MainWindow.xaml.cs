@@ -143,6 +143,7 @@ namespace ViscaUI {
 		static CommandType lastCmdType = CommandType.None;
 		static DateTime lastSend = DateTime.Now;
 		static int lastMsgNum = 0;
+		static int missedReceives = 0;
 
 		public bool keepReading = false;
 		readonly static Queue<byte> receiveQueue = new();
@@ -509,7 +510,11 @@ namespace ViscaUI {
 			if (receiveTimer is not null) {
 				receiveTimer.Stop();
 				receiveTimer.Dispose();
+				receiveTimer = null;
 			}
+
+			missedReceives = 0;
+
 			foreach (byte b in data) {
 				receiveQueue.Enqueue(b);
 			}
@@ -548,13 +553,28 @@ namespace ViscaUI {
 			if (receiveTimer is not null) {
 				receiveTimer.Stop();
 				receiveTimer.Dispose();
+				receiveTimer = null;
 			}
-			_service.Disconnect();
-			msgQueue.Clear();
-			lastCmdType = CommandType.None;
-			ShowConnectedState(false);
-			SetControlsState();
-			DFO("Port closed - no response from " + lastCmdType.ToString());
+
+			if (missedReceives < 3) {
+				missedReceives++;
+				DFO("Receive timeout - no response from " + lastCmdType.ToString());
+				if (!msgQueue.Empty) {
+					VMessage msg = new();
+					msgQueue.Dequeue(ref msg);
+					SendMsg(msg);
+				} else {
+					VMessage msg = new(MessageType.MSG_Command, CommandType.CMD_IFClear, GetAddressByte(), [], "Clear interface");
+					SendMsg(msg);
+				}
+			} else {
+				_service.Disconnect();
+				msgQueue.Clear();
+				ShowConnectedState(false);
+				SetControlsState();
+				DFO("Port closed - no response from " + lastCmdType.ToString());
+				lastCmdType = CommandType.None;
+			}
 		}
 
 		private async void ShowMessage(string msg) {
